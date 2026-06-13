@@ -10,13 +10,13 @@ export function Hero() {
   const [result, setResult] = useState<Certificate | 'not-found' | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const handleVerify = (e: FormEvent) => {
+  const handleVerify = async (e: FormEvent) => {
     e.preventDefault()
     if (!query.trim()) return
     setLoading(true)
     setResult(null)
     setTimeout(() => {
-      const found = findCertificate(query)
+      const found = await findCertificate(query)
       setResult(found ?? 'not-found')
       setLoading(false)
     }, 900)
