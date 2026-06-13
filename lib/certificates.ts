@@ -1,5 +1,22 @@
 import { createClient } from "@supabase/supabase-js"
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+// Required for SampleReports component
+export const certificates = [
+  {
+    number: "GL-RUD-2026-000001",
+    productName: "5 Mukhi Rudraksha",
+    image: "/placeholder.svg",
+    category: "Rudraksha",
+    weight: "",
+    issueDate: "",
+  },
+]
+
 export type Certificate = {
   number: string
   productName: string
@@ -7,11 +24,6 @@ export type Certificate = {
   image: string
   mukhi: string
 }
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 export async function findCertificate(
   input: string
@@ -23,7 +35,7 @@ export async function findCertificate(
     .single()
 
   if (error || !data) {
-    console.error(error)
+    console.log("Supabase Error:", error)
     return null
   }
 
