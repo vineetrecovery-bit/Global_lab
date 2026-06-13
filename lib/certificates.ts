@@ -5,7 +5,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Required for SampleReports component
 export const certificates = [
   {
     number: "GL-RUD-2026-000001",
@@ -28,10 +27,12 @@ export type Certificate = {
 export async function findCertificate(
   input: string
 ): Promise<Certificate | null> {
+  const query = input.trim()
+
   const { data, error } = await supabase
     .from("Certificates")
     .select("*")
-    .eq("certificates", input.trim())
+    .eq("certificates", query)
     .single()
 
   if (error) {
