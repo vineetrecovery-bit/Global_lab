@@ -1,47 +1,26 @@
-export type Certificate = {
-  number: string
-  productName: string
-  origin: string
-  weight: string
-  issueDate: string
-  image: string
-  category: 'Rudraksha' | 'Gemstone'
-}
+import { createClient } from "@supabase/supabase-js"
 
-export const certificates: Certificate[] = [
-  {
-    number: 'GL-RUD-2024-0001',
-    productName: '5 Mukhi Rudraksha',
-    origin: 'Nepal, Himalayan Region',
-    weight: '1.84 ct',
-    issueDate: '12 March 2024',
-    image: '/report-rudraksha.png',
-    category: 'Rudraksha',
-  },
-  {
-    number: 'GL-EMR-2024-0042',
-    productName: 'Natural Emerald (Panna)',
-    origin: 'Colombia, Muzo Mines',
-    weight: '3.27 ct',
-    issueDate: '28 June 2024',
-    image: '/report-emerald.png',
-    category: 'Gemstone',
-  },
-  {
-    number: 'GL-RUB-2024-0118',
-    productName: 'Natural Ruby (Manik)',
-    origin: 'Myanmar, Mogok Valley',
-    weight: '2.55 ct',
-    issueDate: '04 September 2024',
-    image: '/report-ruby.png',
-    category: 'Gemstone',
-  },
-]
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
-export function findCertificate(input: string): Certificate | null {
-  const query = input.trim().toUpperCase()
-  if (!query) return null
-  return (
-    certificates.find((c) => c.number.toUpperCase() === query) ?? null
-  )
+export async function findCertificate(input: string) {
+  const { data, error } = await supabase
+    .from("Certificates")
+    .select("*")
+    .eq("Certificate_no", input)
+    .single()
+
+  if (error || !data) {
+    return null
+  }
+
+  return {
+    number: data.Certificate_no,
+    productName: data.product_name,
+    origin: data.origin,
+    image: data.certificate_image,
+    mukhi: data.Mukhi,
+  }
 }
