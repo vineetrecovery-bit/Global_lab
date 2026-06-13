@@ -31,22 +31,23 @@ export async function findCertificate(
   const { data, error } = await supabase
     .from("Certificates")
     .select("*")
-    .eq("Certificate_no", input.trim())
+    .eq("certificates", input.trim())
     .single()
-if (error) {
-  console.log("SUPABASE ERROR:", error)
-  return null
-}
 
-console.log("SUPABASE DATA:", data)
+  if (error) {
+    console.log("SUPABASE ERROR:", error)
+    return null
+  }
 
-if (!data) {
-  console.log("NO DATA FOUND")
-  return null
-}
+  if (!data) {
+    console.log("NO DATA FOUND")
+    return null
+  }
+
+  console.log("SUPABASE DATA:", data)
 
   return {
-    number: data.Certificate_no,
+    number: data.certificates,
     productName: data.product_name,
     origin: data.origin,
     image: data.certificate_image,
