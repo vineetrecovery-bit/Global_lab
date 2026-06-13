@@ -12,14 +12,26 @@ export function Hero() {
 
   const handleVerify = async (e: FormEvent) => {
     e.preventDefault()
+
     if (!query.trim()) return
+
     setLoading(true)
     setResult(null)
-    setTimeout(() => {
+
+    try {
       const found = await findCertificate(query)
-      setResult(found ?? 'not-found')
-      setLoading(false)
-    }, 900)
+
+      if (found) {
+        setResult(found)
+      } else {
+        setResult('not-found')
+      }
+    } catch (error) {
+      console.error(error)
+      setResult('not-found')
+    }
+
+    setLoading(false)
   }
 
   return (
@@ -41,11 +53,12 @@ export function Hero() {
         <p className="animate-fade-up text-[0.75rem] tracking-luxury text-gold">
           INTERNATIONAL CERTIFICATION AUTHORITY
         </p>
+
         <span className="gold-line mx-auto mt-6 block h-px w-24" />
 
         <h1 className="animate-fade-up font-heading mt-7 text-balance text-4xl font-semibold leading-[1.1] text-primary-foreground sm:text-6xl lg:text-7xl">
           Scientific Authentication
-          <span className="block text-gold">{'& Certification'}</span>
+          <span className="block text-gold">& Certification</span>
         </h1>
 
         <p className="animate-fade-up mx-auto mt-7 max-w-2xl text-pretty text-base font-light leading-relaxed text-primary-foreground/70 sm:text-lg">
@@ -59,6 +72,7 @@ export function Hero() {
         >
           <div className="flex flex-1 items-center gap-3 rounded-md bg-background/5 px-4">
             <Search className="h-5 w-5 shrink-0 text-gold" />
+
             <input
               type="text"
               value={query}
@@ -68,17 +82,18 @@ export function Hero() {
               className="w-full bg-transparent py-4 text-primary-foreground placeholder:text-primary-foreground/40 focus:outline-none"
             />
           </div>
+
           <button
             type="submit"
             disabled={loading}
             className="rounded-md bg-gold px-8 py-4 text-sm font-medium tracking-wide text-gold-foreground transition-all duration-300 hover:brightness-110 disabled:opacity-60"
           >
-            {loading ? 'Verifying…' : 'Verify Certificate'}
+            {loading ? 'Verifying...' : 'Verify Certificate'}
           </button>
         </form>
 
         <p className="animate-fade-up mt-4 text-xs text-primary-foreground/40">
-          Try a sample: GL-RUD-2024-0001 · GL-EMR-2024-0042 · GL-RUB-2024-0118
+          Enter your certificate number to verify authenticity.
         </p>
 
         <div className="mx-auto max-w-3xl text-left">
