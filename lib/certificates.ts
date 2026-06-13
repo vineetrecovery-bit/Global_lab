@@ -33,11 +33,17 @@ export async function findCertificate(
     .select("*")
     .eq("Certificate_no", input.trim())
     .single()
+if (error) {
+  console.log("SUPABASE ERROR:", error)
+  return null
+}
 
-  if (error || !data) {
-    console.log("Supabase Error:", error)
-    return null
-  }
+console.log("SUPABASE DATA:", data)
+
+if (!data) {
+  console.log("NO DATA FOUND")
+  return null
+}
 
   return {
     number: data.Certificate_no,
