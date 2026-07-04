@@ -8,6 +8,7 @@ import { VerificationProcess } from '@/components/verification-process'
 import { WhyGlobalLab } from '@/components/why-global-lab'
 import { Contact } from '@/components/contact'
 import { Footer } from '@/components/footer'
+import { AdminPanel } from '@/components/admin-panel'
 
 export default function Page() {
   return (
@@ -22,6 +23,7 @@ export default function Page() {
       <WhyGlobalLab />
       <Contact />
       <Footer />
+      <AdminPanel />
     </main>
   )
 }

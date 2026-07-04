@@ -10,10 +10,8 @@ const storage = new Storage(client)
 
 export type Certificate = {
   Batchno: string
-  Rudraksh_Type: string
-  Dimensions: string
-  Origin: string
   Certificate_photograph: string
+  [key: string]: string
 }
 
 export async function findCertificate(
@@ -44,13 +42,19 @@ export async function findCertificate(
       }
     }
 
-    return {
+    // Return ALL fields dynamically
+    const result: Certificate = {
       Batchno: data.Batchno as string,
-      Rudraksh_Type: data.Rudraksh_Type as string,
-      Dimensions: data.Dimensions as string,
-      Origin: data.Origin as string,
       Certificate_photograph: imageUrl,
     }
+
+    Object.entries(data).forEach(([key, value]) => {
+      if (!key.startsWith("$") && key !== "Batchno" && key !== "Certificate_photograph") {
+        result[key] = String(value ?? "")
+      }
+    })
+
+    return result
   } catch (error) {
     console.error("Appwrite :: findCertificate error:", error)
     return null
