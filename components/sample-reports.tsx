@@ -1,7 +1,39 @@
 import Image from 'next/image'
 import { ArrowUpRight } from 'lucide-react'
 import { Reveal } from '@/components/reveal'
-import { certificates } from '@/lib/certificates'
+
+const certificates = [
+  {
+    number: 'GL-2025-00142',
+    productName: 'Nepal 7 Mukhi Rudraksha',
+    category: 'Rudraksha',
+    origin: 'Nepal',
+    image: '/report-rudraksha.png',
+    mukhi: '7',
+    weight: '12.4 g',
+    issueDate: '15 Jan 2025',
+  },
+  {
+    number: 'GL-2025-00098',
+    productName: 'Indonesian 5 Mukhi Rudraksha',
+    category: 'Rudraksha',
+    origin: 'Indonesia',
+    image: '/report-emerald.png',
+    mukhi: '5',
+    weight: '8.7 g',
+    issueDate: '03 Feb 2025',
+  },
+  {
+    number: 'GL-2025-00217',
+    productName: 'Nepal 14 Mukhi Rudraksha',
+    category: 'Rudraksha',
+    origin: 'Nepal',
+    image: '/report-ruby.png',
+    mukhi: '14',
+    weight: '18.2 g',
+    issueDate: '21 Feb 2025',
+  },
+]
 
 export function SampleReports() {
   return (

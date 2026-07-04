@@ -1,8 +1,12 @@
 'use client'
 
 import Image from 'next/image'
-import { BadgeCheck, ShieldX, CalendarDays, MapPin, Scale, Hash, Tag } from 'lucide-react'
+import { BadgeCheck, ShieldX, MapPin, Ruler, Hash, Tag } from 'lucide-react'
 import type { Certificate } from '@/lib/certificates'
+
+function hasValue(val: string | null | undefined): val is string {
+  return !!val && val.trim().length > 0
+}
 
 export function CertificateResult({
   result,
@@ -22,20 +26,20 @@ export function CertificateResult({
         </h3>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
           We could not locate a certificate matching that verification number.
-          Please check the number and try again. Genuine Global Lab certificates
-          follow the format GL-XXX-YYYY-NNNN.
+          Please check the number and try again.
         </p>
       </div>
     )
   }
 
   const details = [
-    { icon: Hash, label: 'Certificate Number', value: result.number },
-    { icon: Tag, label: 'Product Name', value: result.productName },
-    { icon: MapPin, label: 'Origin', value: result.origin },
-    { icon: Scale, label: 'Weight', value: result.weight },
-    { icon: CalendarDays, label: 'Issue Date', value: result.issueDate },
-  ]
+    { icon: Hash, label: 'Batch Number', value: result.Batchno },
+    { icon: Tag, label: 'Rudraksh Type', value: result.Rudraksh_Type },
+    { icon: Ruler, label: 'Dimensions', value: result.Dimensions },
+    { icon: MapPin, label: 'Origin', value: result.Origin },
+  ].filter((d) => d.label === 'Batch Number' || hasValue(d.value))
+
+  const showImage = hasValue(result.Certificate_photograph)
 
   return (
     <div className="animate-fade-up mt-8 overflow-hidden rounded-lg border border-gold/30 bg-card shadow-xl shadow-black/10">
@@ -50,34 +54,48 @@ export function CertificateResult({
           </p>
         </div>
         <span className="ml-auto rounded-full border border-gold/40 px-3 py-1 text-[0.65rem] tracking-luxury text-gold">
-          {result.category.toUpperCase()}
+          RUDRAKSHA
         </span>
       </div>
 
-      <div className="grid gap-8 p-6 sm:p-8 md:grid-cols-[1fr_1.3fr]">
-        <div className="relative aspect-square overflow-hidden rounded-md border border-border bg-secondary">
-          <Image
-            src={result.image || '/placeholder.svg'}
-            alt={`Certified ${result.productName}`}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 100vw, 320px"
-          />
-        </div>
+      <div className={`grid gap-8 p-6 sm:p-8 ${showImage ? 'md:grid-cols-[1fr_1.3fr]' : ''}`}>
+      {showImage && (
+      <a
+      href={result.Certificate_photograph!}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="overflow-hidden rounded-md border border-border bg-secondary transition-all duration-300 hover:border-gold/50 hover:shadow-lg"
+      >
+      <Image
+      src={result.Certificate_photograph!}
+      alt={`Certificate ${result.Batchno}`}
+      width={800}
+      height={1100}
+      className="h-auto w-full object-contain"
+      sizes="(max-width: 768px) 100vw, 400px"
+      />
+      </a>
+      )}
 
-        <dl className="flex flex-col justify-center divide-y divide-border">
-          {details.map((d) => (
-            <div
-              key={d.label}
-              className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0"
-            >
-              <d.icon className="h-4 w-4 shrink-0 text-gold" />
-              <dt className="w-40 shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
-                {d.label}
-              </dt>
-              <dd className="font-medium text-foreground">{d.value}</dd>
-            </div>
-          ))}
+        <dl className={`flex flex-col justify-center divide-y divide-border ${!showImage ? 'col-span-full' : ''}`}>
+          {details.length > 0 ? (
+            details.map((d) => (
+              <div
+                key={d.label}
+                className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0"
+              >
+                <d.icon className="h-4 w-4 shrink-0 text-gold" />
+                <dt className="w-40 shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
+                  {d.label}
+                </dt>
+                <dd className="font-medium text-foreground">{d.value}</dd>
+              </div>
+            ))
+          ) : (
+            <p className="py-4 text-sm text-muted-foreground">
+              Only batch number is available for this certificate.
+            </p>
+          )}
         </dl>
       </div>
     </div>

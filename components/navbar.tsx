@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { cn } from '@/lib/utils'
 
 const links = [
@@ -11,9 +11,14 @@ const links = [
   { label: 'Contact', href: '#contact' },
 ]
 
+// Sections with dark backgrounds
+const darkSections = ['home', 'verification', 'verification-process']
+
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
+  const [isDark, setIsDark] = useState(true)
+  const observerRef = useRef<IntersectionObserver | null>(null)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -22,13 +27,46 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  useEffect(() => {
+    const sectionIds = ['home', 'verification', 'reports', 'about', 'contact', 'verification-process']
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const id = entry.target.id
+            setIsDark(darkSections.includes(id))
+          }
+        })
+      },
+      { threshold: 0.3 }
+    )
+
+    sectionIds.forEach((id) => {
+      const el = document.getElementById(id)
+      if (el) observer.observe(el)
+    })
+
+    observerRef.current = observer
+    return () => observer.disconnect()
+  }, [])
+
+  const textClass = isDark ? 'text-background/80' : 'text-foreground/80'
+  const textHoverClass = isDark ? 'hover:text-gold' : 'hover:text-gold'
+  const logoTextClass = isDark ? 'text-background' : 'text-foreground'
+  const lineClass = isDark ? 'bg-background' : 'bg-foreground'
+  const navBg = scrolled
+    ? isDark
+      ? 'glass-dark py-3 shadow-lg shadow-black/20'
+      : 'glass py-3 shadow-lg shadow-black/5'
+    : 'bg-transparent py-5'
+  const mobileBg = isDark ? 'glass-dark' : 'glass'
+
   return (
     <header
       className={cn(
         'fixed inset-x-0 top-0 z-50 transition-all duration-500',
-        scrolled
-          ? 'glass-dark py-3 shadow-lg shadow-black/20'
-          : 'bg-transparent py-5',
+        navBg,
       )}
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 lg:px-10">
@@ -38,7 +76,7 @@ export function Navbar() {
               G
             </span>
           </span>
-          <span className="font-heading text-xl font-semibold tracking-[0.18em] text-background">
+          <span className={cn('font-heading text-xl font-semibold tracking-[0.18em] transition-colors duration-500', logoTextClass)}>
             GLOBAL LAB
           </span>
         </a>
@@ -48,7 +86,11 @@ export function Navbar() {
             <li key={link.href}>
               <a
                 href={link.href}
-                className="group relative text-sm font-light tracking-wide text-background/80 transition-colors hover:text-gold"
+                className={cn(
+                  'group relative text-sm font-light tracking-wide transition-colors duration-500',
+                  textClass,
+                  textHoverClass,
+                )}
               >
                 {link.label}
                 <span className="absolute -bottom-1 left-0 h-px w-0 bg-gold transition-all duration-300 group-hover:w-full" />
@@ -72,19 +114,22 @@ export function Navbar() {
         >
           <span
             className={cn(
-              'h-px w-6 bg-background transition-all',
+              'h-px w-6 transition-all duration-300',
+              lineClass,
               open && 'translate-y-[7px] rotate-45',
             )}
           />
           <span
             className={cn(
-              'h-px w-6 bg-background transition-all',
+              'h-px w-6 transition-all duration-300',
+              lineClass,
               open && 'opacity-0',
             )}
           />
           <span
             className={cn(
-              'h-px w-6 bg-background transition-all',
+              'h-px w-6 transition-all duration-300',
+              lineClass,
               open && '-translate-y-[7px] -rotate-45',
             )}
           />
@@ -92,14 +137,18 @@ export function Navbar() {
       </nav>
 
       {open && (
-        <div className="glass-dark mt-3 lg:hidden">
+        <div className={cn('mt-3 lg:hidden', mobileBg)}>
           <ul className="flex flex-col px-6 py-4">
             {links.map((link) => (
               <li key={link.href}>
                 <a
                   href={link.href}
                   onClick={() => setOpen(false)}
-                  className="block py-3 text-sm font-light tracking-wide text-background/80 transition-colors hover:text-gold"
+                  className={cn(
+                    'block py-3 text-sm font-light tracking-wide transition-colors duration-500',
+                    textClass,
+                    textHoverClass,
+                  )}
                 >
                   {link.label}
                 </a>
