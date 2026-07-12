@@ -14,15 +14,6 @@ function formatLabel(key: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function getFieldIcon(key: string) {
-  if (key.toLowerCase().includes('type')) return Tag
-  if (key.toLowerCase().includes('dimension')) return null
-  if (key.toLowerCase().includes('origin')) return null
-  if (key.toLowerCase().includes('weight')) return null
-  if (key.toLowerCase().includes('date')) return null
-  return null
-}
-
 export function CertificateResult({
   result,
 }: {
@@ -47,20 +38,17 @@ export function CertificateResult({
     )
   }
 
-  // Build dynamic details list — Batchno always first, then all other non-empty fields
-  const details: { label: string; value: string; icon: any }[] = []
+  // Build dynamic details list
+  const details: { label: string; value: string }[] = []
 
-  // Batchno always shows
-  details.push({ label: 'Batch Number', value: result.Batchno, icon: Hash })
+  details.push({ label: 'Batch Number', value: result.Batchno })
 
-  // All other fields except Certificate_photograph
   Object.entries(result).forEach(([key, value]) => {
     if (key === 'Batchno' || key === 'Certificate_photograph') return
     if (hasValue(value)) {
       details.push({
         label: formatLabel(key),
         value: value,
-        icon: getFieldIcon(key),
       })
     }
   })
@@ -84,38 +72,38 @@ export function CertificateResult({
         </span>
       </div>
 
-      <div className={`grid gap-8 p-6 sm:p-8 ${showImage ? 'md:grid-cols-[1fr_1.3fr]' : ''}`}>
+      <div className="p-6 sm:p-8">
+        {/* Image on top, centered, compact */}
         {showImage && (
-          <a
-            href={result.Certificate_photograph}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="overflow-hidden rounded-md border border-border bg-secondary transition-all duration-300 hover:border-gold/50 hover:shadow-lg"
-          >
-            <Image
-              src={result.Certificate_photograph!}
-              alt={`Certificate ${result.Batchno}`}
-              width={800}
-              height={1100}
-              className="h-auto w-full object-contain"
-              sizes="(max-width: 768px) 100vw, 400px"
-            />
-          </a>
+          <div className="mb-6 flex justify-center">
+            <a
+              href={result.Certificate_photograph}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="overflow-hidden rounded-md border border-border bg-secondary transition-all duration-300 hover:border-gold/50 hover:shadow-lg"
+            >
+              <Image
+                src={result.Certificate_photograph!}
+                alt={`Certificate ${result.Batchno}`}
+                width={320}
+                height={440}
+                className="h-auto w-full max-w-xs object-contain"
+                sizes="320px"
+              />
+            </a>
+          </div>
         )}
 
-        <dl className={`flex flex-col justify-center divide-y divide-border ${!showImage ? 'col-span-full' : ''}`}>
+        {/* Details below */}
+        <dl className="grid gap-x-8 gap-y-0 divide-y divide-border sm:grid-cols-2">
           {details.length > 0 ? (
             details.map((d) => (
               <div
                 key={d.label}
                 className="flex items-center gap-4 py-3.5 first:pt-0 last:pb-0"
               >
-                {d.icon ? (
-                  <d.icon className="h-4 w-4 shrink-0 text-gold" />
-                ) : (
-                  <span className="h-4 w-4 shrink-0" />
-                )}
-                <dt className="w-40 shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
+                <Hash className="h-3.5 w-3.5 shrink-0 text-gold" />
+                <dt className="w-36 shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
                   {d.label}
                 </dt>
                 <dd className="font-medium text-foreground">{d.value}</dd>

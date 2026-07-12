@@ -31,15 +31,7 @@ export async function findCertificate(
     // Convert Appwrite Storage file ID to viewable URL
     let imageUrl = ""
     if (data.Certificate_photograph) {
-      try {
-        const url = storage.getFileView(
-          process.env.NEXT_PUBLIC_APPWRITE_BUCKET_ID!,
-          data.Certificate_photograph as string
-        )
-        imageUrl = url.toString()
-      } catch {
-        imageUrl = data.Certificate_photograph as string
-      }
+      imageUrl = `/api/certificate-image/${data.Certificate_photograph}`
     }
 
     // Return ALL fields dynamically

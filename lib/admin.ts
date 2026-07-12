@@ -171,5 +171,5 @@ export async function uploadImage(file: File): Promise<string> {
 }
 
 export function getImageUrl(fileId: string): string {
-  return storage.getFileView(BUCKET_ID, fileId).toString()
+  return `/api/certificate-image/${fileId}`
 }
