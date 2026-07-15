@@ -25,7 +25,10 @@ export function AdminPanel() {
 
   useEffect(() => {
     admin.getAdminUser().then((u) => {
-      if (u) { setUser(u); setMode('panel') }
+      if (u) {
+        setUser(u)
+        setMode('panel')
+      }
       setChecking(false)
     })
   }, [])
@@ -150,7 +153,6 @@ function LoginForm({ onSubmit }: { onSubmit: (e: string, p: string) => void }) {
 function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
   return (
     <div className="fixed inset-0 z-[90] flex flex-col bg-background">
-      {/* Top Bar */}
       <div className="flex shrink-0 items-center justify-between bg-primary px-6 py-4">
         <div className="flex items-center gap-3">
           <Shield className="h-5 w-5 text-gold" />
@@ -169,8 +171,6 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
           </button>
         </div>
       </div>
-
-      {/* Content */}
       <div className="flex-1 overflow-auto p-6">
         <RowsTab />
       </div>
@@ -185,6 +185,15 @@ function RowsTab() {
   const [loading, setLoading] = useState(true)
   const [formMode, setFormMode] = useState<null | 'add' | { edit: any }>(null)
   const [search, setSearch] = useState('')
+
+  // CSV state
+  const [csvModal, setCsvModal] = useState(false)
+  const [csvData, setCsvData] = useState<{ headers: string[]; rows: string[][] } | null>(null)
+  const [csvFileName, setCsvFileName] = useState('')
+  const [csvImporting, setCsvImporting] = useState(false)
+  const [csvProgress, setCsvProgress] = useState({ done: 0, failed: 0, total: 0 })
+  const [csvDone, setCsvDone] = useState(false)
+  const csvInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = async () => {
     setLoading(true)
@@ -222,6 +231,69 @@ function RowsTab() {
     }
   }
 
+  // CSV handlers
+  const handleCsvSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCsvFileName(file.name)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      const parsed = parseCSV(text)
+      setCsvData(parsed)
+      setCsvModal(true)
+      setCsvDone(false)
+      setCsvProgress({ done: 0, failed: 0, total: 0 })
+    }
+    reader.readAsText(file)
+    if (csvInputRef.current) csvInputRef.current.value = ''
+  }
+
+  const handleCsvImport = async () => {
+    if (!csvData) return
+    setCsvImporting(true)
+    setCsvDone(false)
+    const columnKeys = columns.map((c) => c.key)
+    const total = csvData.rows.length
+    let done = 0
+    let failed = 0
+    setCsvProgress({ done: 0, failed: 0, total })
+
+    for (const row of csvData.rows) {
+      const doc: Record<string, unknown> = {}
+      csvData.headers.forEach((header, i) => {
+        const matchedKey = columnKeys.find(
+          (k) => k.toLowerCase() === header.toLowerCase().trim()
+        )
+        if (matchedKey && matchedKey !== 'Certificate_photograph') {
+          doc[matchedKey] = row[i]?.trim() || ''
+        }
+      })
+      try {
+        await admin.createDocument(doc)
+        done++
+      } catch {
+        failed++
+      }
+      setCsvProgress({ done, failed, total })
+    }
+
+    setCsvImporting(false)
+    setCsvDone(true)
+    fetchData()
+  }
+
+  const getCsvMapping = () => {
+    if (!csvData) return []
+    const columnKeys = columns.map((c) => c.key)
+    return csvData.headers.map((h) => {
+      const matched = columnKeys.find(
+        (k) => k.toLowerCase() === h.toLowerCase().trim()
+      )
+      return { csv: h, db: matched, matched: !!matched }
+    })
+  }
+
   const filtered = search
     ? documents.filter((doc) =>
         columns.some((col) =>
@@ -248,6 +320,19 @@ function RowsTab() {
             className="flex items-center gap-2 rounded-md bg-gold px-4 py-2.5 text-xs font-medium text-gold-foreground transition-all hover:brightness-110"
           >
             <Plus className="h-4 w-4" /> Add Row
+          </button>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleCsvSelect}
+            className="hidden"
+          />
+          <button
+            onClick={() => csvInputRef.current?.click()}
+            className="flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-xs text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground"
+          >
+            <Upload className="h-4 w-4" /> Import CSV
           </button>
           <button
             onClick={fetchData}
@@ -321,6 +406,88 @@ function RowsTab() {
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">{filtered.length} row(s)</p>
+
+      {/* CSV Import Modal */}
+      {csvModal && csvData && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setCsvModal(false)} />
+          <div className="relative w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-2xl">
+            <button onClick={() => setCsvModal(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+              <X className="h-5 w-5" />
+            </button>
+
+            <h3 className="font-heading text-lg font-semibold">Import CSV</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{csvFileName} — {csvData.rows.length} row(s)</p>
+
+            <div className="mt-6">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-3">Column Mapping</p>
+              <div className="space-y-2">
+                {getCsvMapping().map((m) => (
+                  <div key={m.csv} className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <span className="text-sm text-foreground">{m.csv}</span>
+                    <span className="text-xs text-muted-foreground">→</span>
+                    <span className={`text-sm ${m.matched ? 'text-green-500' : 'text-destructive'}`}>
+                      {m.matched ? m.db : 'Not matched (skipped)'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {csvData.headers.some((h) =>
+                columns.some((c) => c.key.toLowerCase() === h.toLowerCase().trim() && c.key === 'Certificate_photograph')
+              ) && (
+                <p className="mt-3 text-xs text-yellow-500">⚠ Certificate_photograph found — images must be uploaded separately per row.</p>
+              )}
+            </div>
+
+            {csvImporting && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                  <span>Importing...</span>
+                  <span>{csvProgress.done + csvProgress.failed} / {csvProgress.total}</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full bg-gold transition-all duration-300"
+                    style={{ width: `${((csvProgress.done + csvProgress.failed) / csvProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {csvDone && (
+              <div className="mt-6 rounded-md border border-border bg-secondary/50 p-4">
+                <p className="text-sm font-medium text-foreground">Import Complete</p>
+                <div className="mt-2 flex gap-6 text-xs">
+                  <span className="text-green-500">✓ {csvProgress.done} imported</span>
+                  {csvProgress.failed > 0 && (
+                    <span className="text-destructive">✗ {csvProgress.failed} failed</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setCsvModal(false)}
+                disabled={csvImporting}
+                className="flex-1 rounded-md border border-border px-4 py-3 text-xs font-medium text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground disabled:opacity-50"
+              >
+                Close
+              </button>
+              {!csvDone && (
+                <button
+                  onClick={handleCsvImport}
+                  disabled={csvImporting}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-xs font-medium text-gold-foreground transition-all hover:brightness-110 disabled:opacity-50"
+                >
+                  {csvImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {csvImporting ? 'Importing...' : 'Import'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Row Form Modal */}
       {formMode && (
@@ -461,11 +628,7 @@ function RowFormModal({
                     disabled={uploading}
                     className="flex items-center gap-2 rounded-md border border-dashed border-border px-4 py-3 text-xs text-muted-foreground transition-all hover:border-gold/50 hover:text-gold disabled:opacity-50"
                   >
-                    {uploading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Upload className="h-4 w-4" />
-                    )}
+                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                     {uploading ? 'Uploading...' : imagePreview ? 'Replace Image' : 'Upload Certificate Image'}
                   </button>
                   {formData.Certificate_photograph && (
@@ -498,13 +661,7 @@ function RowFormModal({
               disabled={loading || uploading}
               className="flex flex-1 items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-xs font-medium text-gold-foreground transition-all hover:brightness-110 disabled:opacity-50"
             >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : editData ? (
-                <Save className="h-4 w-4" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : editData ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               {loading ? 'Saving...' : editData ? 'Update Row' : 'Add Row'}
             </button>
           </div>
@@ -512,4 +669,58 @@ function RowFormModal({
       </div>
     </div>
   )
+}
+
+// ===================== CSV PARSER =====================
+function parseCSV(text: string): { headers: string[]; rows: string[][] } {
+  const lines: string[] = []
+  let current = ''
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    if (char === '"') {
+      i++
+      while (i < text.length && text[i] !== '"') {
+        current += text[i]
+        i++
+      }
+    } else if (char === '\n') {
+      lines.push(current)
+      current = ''
+    } else if (char === '\r') {
+      // skip
+    } else {
+      current += char
+    }
+  }
+  if (current.trim()) lines.push(current)
+
+  const splitRow = (line: string): string[] => {
+    const result: string[] = []
+    let field = ''
+    let inQuotes = false
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      if (char === '"') {
+        inQuotes = !inQuotes
+      } else if (char === ',' && !inQuotes) {
+        result.push(field.trim())
+        field = ''
+      } else {
+        field += char
+      }
+    }
+    result.push(field.trim())
+    return result
+  }
+
+  const allRows = lines.map(splitRow).filter((r) => r.some((c) => c.length > 0))
+
+  if (allRows.length === 0) return { headers: [], rows: [] }
+
+  return {
+    headers: allRows[0],
+    rows: allRows.slice(1),
+  }
 }

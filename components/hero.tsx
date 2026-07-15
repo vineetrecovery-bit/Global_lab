@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Search } from 'lucide-react'
 import { findCertificate, type Certificate } from '@/lib/certificates'
 import { CertificateResult } from '@/components/certificate-result'
@@ -10,19 +10,29 @@ export function Hero() {
   const [result, setResult] = useState<Certificate | 'not-found' | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const handleVerify = async (e: FormEvent) => {
-    e.preventDefault()
+  // Auto-verify from URL param on page load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const batch = params.get('batch')
+    if (batch) {
+      setQuery(batch)
+      runVerify(batch)
+    }
+  }, [])
 
-    if (!query.trim()) return
+  const runVerify = async (value: string) => {
+    if (!value.trim()) return
 
     setLoading(true)
     setResult(null)
 
     try {
-      const found = await findCertificate(query)
+      const found = await findCertificate(value)
 
       if (found) {
         setResult(found)
+        // Update URL with batch number
+        window.history.replaceState(null, '', `?batch=${encodeURIComponent(value)}`)
       } else {
         setResult('not-found')
       }
@@ -32,6 +42,11 @@ export function Hero() {
     }
 
     setLoading(false)
+  }
+
+  const handleVerify = async (e: FormEvent) => {
+    e.preventDefault()
+    await runVerify(query)
   }
 
   return (

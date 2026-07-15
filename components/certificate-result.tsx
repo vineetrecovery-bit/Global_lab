@@ -28,10 +28,10 @@ export function CertificateResult({
           <ShieldX className="h-8 w-8 text-destructive" />
         </div>
         <h3 className="font-heading mt-5 text-2xl font-semibold text-foreground">
-          Certificate Not Found
+          Match Not Found
         </h3>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-          We could not locate a certificate matching that verification number.
+          We could not locate a entry matching that verification number.
           Please check the number and try again.
         </p>
       </div>
@@ -67,8 +67,8 @@ export function CertificateResult({
             VERIFIED
           </p>
         </div>
-        <span className="ml-auto rounded-full border border-gold/40 px-3 py-1 text-[0.65rem] tracking-luxury text-gold">
-          RUDRAKSHA
+        <span className="ml-auto rounded-full border border-gold/40 px-3 py-1 text-[0.65rem] tracking-luxury text-gold font-semibold">
+          {hasValue(result.CATEGORY) ? result.CATEGORY.toUpperCase() : 'RUDRAKSHA'}
         </span>
       </div>
 
@@ -77,6 +77,7 @@ export function CertificateResult({
         {showImage && (
           <div className="mb-6 flex justify-center">
             <a
+              // href={`/?batch=${encodeURIComponent(result.Batchno)}`}
               href={result.Certificate_photograph}
               target="_blank"
               rel="noopener noreferrer"
