@@ -4,11 +4,11 @@ import { useEffect, useState, useRef } from 'react'
 import { cn } from '@/lib/utils'
 
 const links = [
-  { label: 'Home', href: '#home' },
-  { label: 'Verification', href: '#verification' },
-  { label: 'Sample Reports', href: '#reports' },
-  { label: 'About', href: '#about' },
-  { label: 'Contact', href: '#contact' },
+  { label: 'Home', href: '/' },
+  { label: 'Verification', href: '/#verification' },
+  { label: 'Sample Reports', href: '/#reports' },
+  { label: 'About', href: '/#about' },
+  { label: 'Contact', href: '/#contact' },
 ]
 
 // Sections with dark backgrounds

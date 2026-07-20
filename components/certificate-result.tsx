@@ -41,10 +41,10 @@ export function CertificateResult({
   // Build dynamic details list
   const details: { label: string; value: string }[] = []
 
-  details.push({ label: 'Batch Number', value: result.Batchno })
+  details.push({ label: 'Certificate Number', value: result['CERTIFICATE_NO'] })
 
   Object.entries(result).forEach(([key, value]) => {
-    if (key === 'Batchno' || key === 'Certificate_photograph') return
+    if (key === 'CERTIFICATE_NO' || key === 'Certificate_photograph') return
     if (hasValue(value)) {
       details.push({
         label: formatLabel(key),
@@ -77,7 +77,7 @@ export function CertificateResult({
         {showImage && (
           <div className="mb-6 flex justify-center">
             <a
-              // href={`/?batch=${encodeURIComponent(result.Batchno)}`}
+              // href={`/?batch=${encodeURIComponent(result['CERTIFICATE_NO'])}`}
               href={result.Certificate_photograph}
               target="_blank"
               rel="noopener noreferrer"
@@ -85,7 +85,7 @@ export function CertificateResult({
             >
               <Image
                 src={result.Certificate_photograph!}
-                alt={`Certificate ${result.Batchno}`}
+                alt={`Certificate ${result['CERTIFICATE_NO']}`}
                 width={320}
                 height={440}
                 className="h-auto w-full max-w-xs object-contain"

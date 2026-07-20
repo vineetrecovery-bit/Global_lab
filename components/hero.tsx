@@ -10,29 +10,20 @@ export function Hero() {
   const [result, setResult] = useState<Certificate | 'not-found' | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Auto-verify from URL param on page load
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const batch = params.get('batch')
-    if (batch) {
-      setQuery(batch)
-      runVerify(batch)
-    }
-  }, [])
+  const handleVerify = async (e: FormEvent) => {
+    e.preventDefault()
 
-  const runVerify = async (value: string) => {
-    if (!value.trim()) return
+    if (!query.trim()) return
 
     setLoading(true)
     setResult(null)
 
     try {
-      const found = await findCertificate(value)
+      const found = await findCertificate(query)
 
       if (found) {
         setResult(found)
-        // Update URL with batch number
-        window.history.replaceState(null, '', `?batch=${encodeURIComponent(value)}`)
+        window.history.replaceState(null, '', `?batch=${encodeURIComponent(query)}`)
       } else {
         setResult('not-found')
       }
@@ -42,11 +33,6 @@ export function Hero() {
     }
 
     setLoading(false)
-  }
-
-  const handleVerify = async (e: FormEvent) => {
-    e.preventDefault()
-    await runVerify(query)
   }
 
   return (

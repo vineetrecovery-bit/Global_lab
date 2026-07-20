@@ -9,7 +9,7 @@ const databases = new Databases(client)
 const storage = new Storage(client)
 
 export type Certificate = {
-  Batchno: string
+  'CERTIFICATE_NO': string
   Certificate_photograph: string
   [key: string]: string
 }
@@ -21,7 +21,7 @@ export async function findCertificate(
     const { documents, error } = await databases.listDocuments(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_CERTIFICATES_COLLECTION!,
-      [Query.equal("Batchno", input.trim())]
+      [Query.equal("CERTIFICATE_NO", input.trim())]
     )
 
     if (error || documents.length === 0) return null
@@ -36,12 +36,12 @@ export async function findCertificate(
 
     // Return ALL fields dynamically
     const result: Certificate = {
-      Batchno: data.Batchno as string,
+      'CERTIFICATE_NO': data['CERTIFICATE_NO'] as string,
       Certificate_photograph: imageUrl,
     }
 
     Object.entries(data).forEach(([key, value]) => {
-      if (!key.startsWith("$") && key !== "Batchno" && key !== "Certificate_photograph") {
+      if (!key.startsWith("$") && key !== "CERTIFICATE_NO" && key !== "Certificate_photograph") {
         result[key] = String(value ?? "")
       }
     })
