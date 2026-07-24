@@ -10,20 +10,31 @@ export function Hero() {
   const [result, setResult] = useState<Certificate | 'not-found' | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const handleVerify = async (e: FormEvent) => {
-    e.preventDefault()
+// Auto-verify from shared URL (but NOT on refresh)
+  useEffect(() => {
+    const wasVerified = sessionStorage.getItem('verified')
+    const params = new URLSearchParams(window.location.search)
+    const batch = params.get('batch')
 
-    if (!query.trim()) return
+    if (batch && !wasVerified) {
+      setQuery(batch)
+      runVerify(batch)
+    }
+  }, [])
+
+  const runVerify = async (value: string) => {
+    if (!value.trim()) return
 
     setLoading(true)
     setResult(null)
 
     try {
-      const found = await findCertificate(query)
+      const found = await findCertificate(value)
 
       if (found) {
         setResult(found)
-        window.history.replaceState(null, '', `?batch=${encodeURIComponent(query)}`)
+        window.history.replaceState(null, '', `?batch=${encodeURIComponent(value)}`)
+        sessionStorage.setItem('verified', 'true')
       } else {
         setResult('not-found')
       }
@@ -34,6 +45,12 @@ export function Hero() {
 
     setLoading(false)
   }
+
+  const handleVerify = async (e: FormEvent) => {
+    e.preventDefault()
+    await runVerify(query)
+  }
+
 
   return (
     <section id="home" className="relative overflow-hidden bg-primary">
