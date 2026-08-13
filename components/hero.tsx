@@ -10,13 +10,54 @@ export function Hero() {
   const [result, setResult] = useState<Certificate | 'not-found' | null>(null)
   const [loading, setLoading] = useState(false)
 
-// Auto-verify from shared URL (but NOT on refresh)
+// // Auto-verify from shared URL (but NOT on refresh)
+//   useEffect(() => {
+//     const wasVerified = sessionStorage.getItem('verified')
+//     const params = new URLSearchParams(window.location.search)
+//     const batch = params.get('batch')
+
+//     if (batch && !wasVerified) {
+//       setQuery(batch)
+//       runVerify(batch)
+//     }
+//   }, [])
+
+//   const runVerify = async (value: string) => {
+//     if (!value.trim()) return
+
+//     setLoading(true)
+//     setResult(null)
+
+//     try {
+//       const found = await findCertificate(value)
+
+//       if (found) {
+//         setResult(found)
+//         window.history.replaceState(null, '', `?batch=${encodeURIComponent(value)}`)
+//         sessionStorage.setItem('verified', 'true')
+//       } else {
+//         setResult('not-found')
+//       }
+//     } catch (error) {
+//       console.error(error)
+//       setResult('not-found')
+//     }
+
+//     setLoading(false)
+//   }
+
+//   const handleVerify = async (e: FormEvent) => {
+//     e.preventDefault()
+//     await runVerify(query)
+//  }
+
+
+
+
   useEffect(() => {
-    const wasVerified = sessionStorage.getItem('verified')
     const params = new URLSearchParams(window.location.search)
     const batch = params.get('batch')
-
-    if (batch && !wasVerified) {
+    if (batch) {
       setQuery(batch)
       runVerify(batch)
     }
@@ -34,7 +75,6 @@ export function Hero() {
       if (found) {
         setResult(found)
         window.history.replaceState(null, '', `?batch=${encodeURIComponent(value)}`)
-        sessionStorage.setItem('verified', 'true')
       } else {
         setResult('not-found')
       }
@@ -50,6 +90,22 @@ export function Hero() {
     e.preventDefault()
     await runVerify(query)
   }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   return (
