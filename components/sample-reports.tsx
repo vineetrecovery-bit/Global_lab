@@ -4,34 +4,25 @@ import { Reveal } from '@/components/reveal'
 
 const certificates = [
   {
-    number: 'GL-2025-00142',
-    productName: 'Nepal 7 Mukhi Rudraksha',
+    number: 'GL-12-1',
+    productName: '3 Mukhi Rudraksha',
     category: 'Rudraksha',
     origin: 'Nepal',
-    image: '/report-rudraksha.png',
-    mukhi: '7',
-    weight: '12.4 g',
-    issueDate: '15 Jan 2025',
+    image: '/3-mukhi.jpeg',
   },
   {
-    number: 'GL-2025-00098',
-    productName: 'Indonesian 5 Mukhi Rudraksha',
+    number: 'GL-0012-3',
+    productName: '8 Mukhi Rudraksha',
     category: 'Rudraksha',
     origin: 'Indonesia',
-    image: '/report-emerald.png',
-    mukhi: '5',
-    weight: '8.7 g',
-    issueDate: '03 Feb 2025',
+    image: '/8-mukhi.jpeg',
   },
   {
-    number: 'GL-2025-00217',
-    productName: 'Nepal 14 Mukhi Rudraksha',
+    number: 'GL-12-4',
+    productName: '6 Mukhi Rudraksha',
     category: 'Rudraksha',
     origin: 'Nepal',
-    image: '/report-ruby.png',
-    mukhi: '14',
-    weight: '18.2 g',
-    issueDate: '21 Feb 2025',
+    image: '/6-mukhi.jpeg',
   },
 ]
 
