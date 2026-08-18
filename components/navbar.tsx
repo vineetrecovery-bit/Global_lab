@@ -71,10 +71,8 @@ export function Navbar() {
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 lg:px-10">
         <a href="#home" className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-sm border border-gold/60">
-            <span className="font-heading text-lg font-semibold text-gold">
-              G
-            </span>
+          <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-sm border border-gold/60">
+            <img src="/apple-icon.png" alt="Global Lab" className="h-full w-full object-cover" />
           </span>
           <span className={cn('font-heading text-xl font-semibold tracking-[0.18em] transition-colors duration-500', logoTextClass)}>
             GLOBAL LAB

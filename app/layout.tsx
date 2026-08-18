@@ -35,11 +35,11 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/apple-icon.jpeg',
+        url: '/apple-icon.png',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/apple-icon.jpeg',
+        url: '/apple-icon.png',
         media: '(prefers-color-scheme: dark)',
       },
       {
@@ -47,11 +47,13 @@ export const metadata: Metadata = {
         type: 'image/svg+xml',
       },
     ],
-    apple: '/apple-icon.jpeg',
+    apple: '/apple-icon.png',
   },
 }
 
 export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
   colorScheme: 'light dark',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: 'white' },
