@@ -6,17 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "backup:appwrite": "node scripts/export-appwrite-backup.mjs",
+    "migration:mysql": "node scripts/generate-mysql-import.mjs",
+    "migration:r2-manifest": "node scripts/generate-r2-upload-manifest.mjs",
+    "migration:thumbnails": "node scripts/generate-mysql-thumbnails.mjs",
+    "lint": "eslint .",
+    "migration:validate": "node scripts/validate-migration-artifacts.mjs",
+    "migration:r2-upload": "node scripts/upload-r2-from-manifest.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
-    "@supabase/ssr": "^0.12.0",
-    "@supabase/supabase-js": "^2.108.1",
     "@vercel/analytics": "1.6.1",
-    "appwrite": "^26.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
+    "mysql2": "^3.24.4",
     "next": "16.2.6",
     "react": "^19",
     "react-dom": "^19",
@@ -29,6 +33,7 @@
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "appwrite": "^26.1.0",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "typescript": "5.7.3"

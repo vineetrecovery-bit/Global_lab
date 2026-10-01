@@ -8,6 +8,10 @@ __v0_jsx-dev-runtime.ts
 
 # Environment variables
 .env*.local
+.env
+
+# Local migration backups
+backups/
 
 # Common ignores
 node_modules
