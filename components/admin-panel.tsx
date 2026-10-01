@@ -17,6 +17,12 @@ interface ColumnInfo {
   status: string
 }
 
+type UploadedImagePayload = {
+  objectKey: string
+  originalName: string
+  thumbnailDataUrl?: string
+}
+
 // ===================== MAIN COMPONENT =====================
 export function AdminPanel() {
   const [mode, setMode] = useState<Mode>('closed')
@@ -395,7 +401,7 @@ function RowsTab() {
                   </td>
                   {columns.map((col) => (
                     <td key={col.key} className="max-w-[200px] truncate px-4 py-3 text-foreground">
-                      {renderCell(col.key, doc[col.key])}
+                      {renderCell(col.key, doc[col.key], doc)}
                     </td>
                   ))}
                 </tr>
@@ -502,14 +508,12 @@ function RowsTab() {
   )
 }
 
-function renderCell(key: string, value: any) {
+function renderCell(key: string, value: any, doc: any) {
   if (key === 'Certificate_photograph' && value) {
-    try {
-      const url = admin.getImageUrl(value)
-      return <img src={url} alt="Certificate" className="h-10 w-10 rounded border border-border object-cover" />
-    } catch {
-      return <span className="text-muted-foreground">—</span>
+    if (doc.$thumbnailUrl) {
+      return <img src={doc.$thumbnailUrl} alt="Certificate" className="h-10 w-10 rounded border border-border object-cover" />
     }
+    return <span className="text-muted-foreground">Image</span>
   }
   if (value === null || value === undefined || value === '') {
     return <span className="text-muted-foreground">—</span>
@@ -540,8 +544,10 @@ function RowFormModal({
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [imagePreview, setImagePreview] = useState<string>(
-    editData?.Certificate_photograph ? admin.getImageUrl(editData.Certificate_photograph) : ''
+    editData?.$imageUrl ? admin.getImageUrl(editData) : ''
   )
+  const [uploadedImage, setUploadedImage] = useState<UploadedImagePayload | null>(null)
+  const [removeImage, setRemoveImage] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleChange = (key: string, value: string) => {
@@ -553,8 +559,14 @@ function RowFormModal({
     if (!file) return
     setUploading(true)
     try {
-      const fileId = await admin.uploadImage(file)
-      setFormData((prev) => ({ ...prev, Certificate_photograph: fileId }))
+      const [upload, thumbnailDataUrl] = await Promise.all([
+        admin.uploadImage(file, formData.CERTIFICATE_NO),
+        createThumbnailDataUrl(file),
+      ])
+      const uploaded = { ...upload, thumbnailDataUrl }
+      setUploadedImage(uploaded)
+      setRemoveImage(false)
+      setFormData((prev) => ({ ...prev, Certificate_photograph: uploaded.originalName }))
       setImagePreview(URL.createObjectURL(file))
     } catch {
       alert('Image upload failed')
@@ -573,6 +585,8 @@ function RowFormModal({
         const val = formData[col.key]
         if (val !== undefined) cleanData[col.key] = val
       })
+      if (uploadedImage) cleanData.__uploadedImage = uploadedImage
+      if (removeImage) cleanData.__removeImage = true
       if (editData) {
         await admin.updateDocument(editData.$id, cleanData)
       } else {
@@ -614,7 +628,12 @@ function RowFormModal({
                       <img src={imagePreview} alt="Preview" className="max-h-48 rounded-md border border-border object-contain" />
                       <button
                         type="button"
-                        onClick={() => { setImagePreview(''); setFormData((p) => ({ ...p, Certificate_photograph: '' })) }}
+                        onClick={() => {
+                          setImagePreview('')
+                          setUploadedImage(null)
+                          setRemoveImage(true)
+                          setFormData((p) => ({ ...p, Certificate_photograph: '' }))
+                        }}
                         className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white"
                       >
                         <X className="h-3 w-3" />
@@ -632,7 +651,7 @@ function RowFormModal({
                     {uploading ? 'Uploading...' : imagePreview ? 'Replace Image' : 'Upload Certificate Image'}
                   </button>
                   {formData.Certificate_photograph && (
-                    <p className="mt-1 text-[10px] text-muted-foreground">File ID: {formData.Certificate_photograph}</p>
+                    <p className="mt-1 text-[10px] text-muted-foreground">Image: {formData.Certificate_photograph}</p>
                   )}
                 </div>
               ) : (
@@ -723,4 +742,41 @@ function parseCSV(text: string): { headers: string[]; rows: string[][] } {
     headers: allRows[0],
     rows: allRows.slice(1),
   }
+}
+
+async function createThumbnailDataUrl(file: File): Promise<string | undefined> {
+  if (!file.type.startsWith('image/')) return undefined
+
+  const image = await loadImage(file)
+  const maxSize = 120
+  const scale = Math.min(maxSize / image.naturalWidth, maxSize / image.naturalHeight, 1)
+  const width = Math.max(1, Math.round(image.naturalWidth * scale))
+  const height = Math.max(1, Math.round(image.naturalHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+
+  const context = canvas.getContext('2d')
+  if (!context) return undefined
+
+  context.drawImage(image, 0, 0, width, height)
+  const rawDataUrl = canvas.toDataURL('image/jpeg', 0.72)
+  const base64 = rawDataUrl.split(',')[1]
+  return base64 ? `data:image/jpeg;width=${width};height=${height};base64,${base64}` : undefined
+}
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const image = new Image()
+    image.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(image)
+    }
+    image.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Failed to load image'))
+    }
+    image.src = url
+  })
 }
