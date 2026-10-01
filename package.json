@@ -10,6 +10,9 @@
     "migration:mysql": "node scripts/generate-mysql-import.mjs",
     "migration:r2-manifest": "node scripts/generate-r2-upload-manifest.mjs",
     "migration:thumbnails": "node scripts/generate-mysql-thumbnails.mjs",
+    "security:audit": "node scripts/security-audit.mjs",
+    "security:fix": "node scripts/security-audit.mjs --fix",
+    "security:verify": "npm audit --omit=dev && npm run build",
     "lint": "eslint .",
     "migration:validate": "node scripts/validate-migration-artifacts.mjs",
     "migration:r2-upload": "node scripts/upload-r2-from-manifest.mjs"
@@ -21,7 +24,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
     "mysql2": "^3.24.4",
-    "next": "16.2.6",
+    "next": "16.3.6",
     "react": "^19",
     "react-dom": "^19",
     "shadcn": "^4.8.0",

@@ -12,6 +12,7 @@ __v0_jsx-dev-runtime.ts
 
 # Local migration backups
 backups/
+security-reports/
 
 # Common ignores
 node_modules
