@@ -1,5 +1,10 @@
 # Appwrite to MySQL and Cloudflare R2 Migration Plan
 
+> Historical record: the migration completed successfully. The one-off
+> Appwrite/MySQL/R2 generation and upload scripts described in this document
+> have been retired from the repo after owner approval on 2026-10-03. Ignored
+> local backups are intentionally retained outside Git for now.
+
 ## Goal
 
 Move Global Lab off Appwrite for runtime certificate data and file storage.

@@ -282,7 +282,9 @@ Certificate attributes include category/product, measurements, appearance, mater
 
 Parameterized values and SQL identifier escaping are present; no runtime SQL-injection path was established in the inspected operations. That does not replace input and business validation.
 
-Sources: [schema generator](../scripts/generate-mysql-import.mjs), lines 49–155; [record library](../lib/admin-certificates.ts), lines 74–134,168–204,226–294.
+Sources at audit time included the migration schema generator, later retired on
+2026-10-03 after successful migration, and
+[record library](../lib/admin-certificates.ts), lines 74–134,168–204,226–294.
 
 ### Local database evidence
 
@@ -350,9 +352,12 @@ No browser module directly imports MySQL or the R2 server implementation. Client
 | Legacy timestamps | Preserved provenance; runtime can omit them from public responses. Retention decision precedes deletion. |
 | Removed T21 dead code | Throwing column wrappers, unused button module and old Hero commented implementation were removed after confirming no static callers. |
 | `vercel.json` | Production platform is not established by this file. Remove only after deployment ownership is confirmed. |
-| MySQL/R2 generation and validation scripts | Needed to reproduce local migration artifacts; generated SQL is in ignored backups. Preserve until schema/restore ownership is replaced. |
+| MySQL/R2 generation and validation scripts | Retired on 2026-10-03 after owner confirmed migration completion. Ignored local backups remain retained outside Git. |
 
-Duplicated implementations worth comparing include R2 signing in `lib/r2.ts` versus `scripts/upload-r2-from-manifest.mjs`, object-key construction across upload/import/manifest scripts, three `requiredEnv` functions, and browser/server upload types. Script/runtime duplication is not by itself a reason to couple them; use shared contract fixtures first where executable environments differ.
+Duplicated implementations worth comparing originally included script/runtime R2
+signing and object-key construction. The one-off migration scripts were retired
+after migration completion; runtime helper cleanup should now stay focused on
+live modules and tests.
 
 ## 8. Findings register
 
@@ -404,7 +409,7 @@ All findings below are **Open**. Severity describes the consequence of the imple
 ### A03 — Public identity is not unique
 
 - **Current behavior / problem:** certificate number has a normal index, while both public queries use `LIMIT 1` without duplicate detection. Each create generates a new unique legacy ID, so that constraint does not deduplicate certificate numbers.
-- **Evidence:** `scripts/generate-mysql-import.mjs:138–142`; public routes at `verify/route.ts:51–53` and `[certificateNo]/image/route.ts:30–32`; local information_schema confirmed the non-unique index.
+- **Evidence:** retired migration import SQL recorded the non-unique certificate-number index; public routes at `verify/route.ts:51–53` and `[certificateNo]/image/route.ts:30–32`; local information_schema confirmed the non-unique index.
 - **Impact:** duplicate creates/import retries can make verification ambiguous; separate metadata/image queries are not guaranteed to choose the same duplicate row.
 - **Likely root cause:** migration preserved historical row identity without enforcing the application's lookup identity.
 - **Recommendation:** confirm case/whitespace and revocation/reissue rules, audit duplicates using production collation, resolve conflicts explicitly, then add a versioned unique constraint and return a meaningful 409 on conflicts. Do not automatically delete duplicates.
@@ -539,7 +544,7 @@ All findings below are **Open**. Severity describes the consequence of the imple
 ### A18 — Recreating schema depends on a local backup snapshot
 
 - **Current behavior / problem:** schema SQL is generated from ignored backup data/schema with a hard-coded default snapshot; lengths are inferred from data. Plain inserts are not resumable. Thumbnail generation requires macOS `sips`. Validator checks artifact consistency, not a live production migration.
-- **Evidence:** `scripts/generate-mysql-import.mjs:11–17,29–34,93–123,160–194`; `scripts/generate-mysql-thumbnails.mjs:114–137`; `.gitignore:13–15`; validator lines 156–177.
+- **Evidence:** retired migration generation tooling previously depended on ignored backup data/schema and macOS thumbnail tooling; `.gitignore:13–15`; migration artifact validation output recorded in this audit.
 - **Impact:** a fresh checkout cannot reproduce deployment from tracked files alone; interrupted/repeated imports need operator care. The validator prints duplicate/review counts but those counts alone are not added to its errors list.
 - **Likely root cause:** one-time migration tooling also serves as the long-term schema source.
 - **Recommendation:** establish a sanitized tracked schema baseline and ordered migrations; retain protected backups separately with restore instructions. Define duplicate/review validation policy and resume behavior. Make image tooling portable only if non-macOS execution is required.
@@ -608,9 +613,9 @@ All findings below are **Open**. Severity describes the consequence of the imple
 | V05 | TLS, connection capacity and database backups | Confirm DB transport policy, worker count × pool capacity, restore ownership and a tested restore procedure in an isolated database. |
 | V06 | Cache behavior | Observe deployed response headers and a controlled staging replacement/deletion using synthetic records; do not mutate a real certificate for testing. |
 | V07 | Product invariants | Confirm number casing/reissue/uniqueness, public fields, PDF support, thumbnail optionality, cancellation guarantees and deletion/revocation expectations. |
-| V08 | Operational retirement | Owner confirms Appwrite rollback/export requirements and retention period before removing scripts, IDs, backups or configuration. |
+| V08 | Operational retirement | Owner confirmed migration/Appwrite tooling retirement on 2026-10-03. One-off scripts and Appwrite SDK removed; ignored local backups retained outside Git. |
 
-V01–V06 and V08 remain **Needs verification**; V07 needs product decisions. The local `.env` is not a production-access credential source in this audit. No production data or deployment was modified.
+V01–V06 remain **Needs verification**; V07 needs product decisions. V08 is satisfied for Appwrite/migration tooling retirement, with ignored local backups retained outside Git. The local `.env` is not a production-access credential source in this audit. No production data or deployment was modified.
 
 ## 10. Executed baselines and reproductions
 
@@ -623,7 +628,7 @@ Environment reported Node `v26.9.0`, npm `11.19.1`. These are the execution envi
 | `./node_modules/.bin/tsc --noEmit --incremental false --pretty false` | Exit 2; TS2339 at `components/sample-reports.tsx:71:29` and `:71:45`: `weight` and `issueDate` absent from inferred report type | Existing source errors confirmed; no build-info written |
 | `npm run lint` | ESLint executable not found | No lint result exists; ESLint absent from manifest/lockfile and no config found |
 | `npm test -- --runInBand` | Missing script `test` | No application test suite ran; no test script/framework found |
-| `npm run migration:validate` | Exit 0 | Local backup/SQL/manifest checks passed; 212 certificate inserts, 212 thumbnails, 212 upload items, zero missing/review/duplicate counts |
+| Retired migration artifact validation | Exit 0 before retirement | Local backup/SQL/manifest checks passed; 212 certificate inserts, 212 thumbnails, 212 upload items, zero missing/review/duplicate counts |
 | `npm run build` in isolated copy | Exit 1; `ENOTFOUND fonts.googleapis.com`; Cormorant Garamond and Jost fetches failed | Environment/network-blocked build; not a demonstrated source compilation pass or new source regression |
 | Local DB metadata/aggregate reads | Passed after local network access was allowed | Read-only transaction; results in section 5; initial sandbox EPERM was an access restriction |
 | Static local import graph | 35 modules, 44 edges, 0 cycles | Scoped to source folders/static local imports; not a package vulnerability audit |
@@ -872,3 +877,4 @@ Start collecting V01–V05 and V07 now; do not wait until pickup 12 to request t
 | 2026-10-03 | Recorded operator attestation for production data baseline | Migration plan already records Hostinger MySQL database `u641918041_global_lab`, 212 `certificates` rows, 212 `certificate_thumbnails` rows and 0 duplicate certificate numbers under review. Operator stated no production data changes occurred after migration/import. | Treat 212/212/0 as the current working production-count baseline unless a future live read-only check finds drift. Backup/restore ownership, retention decisions and production smoke evidence remain pending. |
 | 2026-10-03 | Recorded Hostinger backup evidence for V05 | Hostinger backup page shows latest backup `2026-10-02 16:49`, daily automated backups enabled, next backup `2026-10-03`, manual backups available once every 24 hours, and Restore/download/history tabs available. Backup exclusions include backup plugin archives, cache and database export files, with exclusion policy shown from 2026-06-25. | Backup availability/frequency evidence is recorded. Isolated restore drill remains pending, so V05 is only partially satisfied. R2 backup/retention owner also remains pending. |
 | 2026-10-03 | Recorded R2 ownership and privacy evidence | Operator confirmed the Cloudflare R2 bucket `global-lab-certificates` is private and owned by Rohan Chawla. | R2 ownership/private-access evidence is recorded. Retention/lifecycle remains manual/operator-owned unless later configured; orphan cleanup remains pending until retention policy is explicit. |
+| 2026-10-03 | Retired Appwrite and one-off migration tooling | Owner confirmed migration is complete and requested removal of Appwrite dead code/tooling while keeping ignored local backups for now. Removed Appwrite export, MySQL import generation, thumbnail generation, R2 manifest/upload and migration artifact validation scripts; removed related npm scripts and the `appwrite` dev dependency. | Runtime MySQL/R2 code, schema validators, tests and ignored local backups were retained. `package-lock.json` no longer contains `appwrite`. Full local gate should be rerun after this cleanup before push/deploy. |

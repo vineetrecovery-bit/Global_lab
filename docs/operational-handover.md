@@ -141,15 +141,16 @@ Minimum restore drill evidence:
 
 ## Retention And Retirement Decisions
 
-Do not delete migration, Appwrite export, backup, rollback or restore tooling
-until the owner and retention window are recorded.
+Migration/Appwrite export tooling has been retired after successful migration.
+The ignored local backup folder is intentionally retained for now and must not
+be committed.
 
 | Decision | Owner | Status |
 |---|---|---|
-| Appwrite export/rollback retention window | Pending | Pending |
-| Local ignored backup retention policy | Pending | Pending |
+| Appwrite export/rollback retention window | Rohan Chawla | Keep ignored local backup for now; no new Appwrite export tooling retained in repo |
+| Local ignored backup retention policy | Rohan Chawla | Retained locally; do not delete or commit |
 | R2 orphan cleanup policy | Pending | Pending |
-| Migration script retirement approval | Pending | Pending |
+| Migration script retirement approval | Rohan Chawla | Approved 2026-10-03; one-off Appwrite/MySQL/R2 migration scripts removed |
 | `vercel.json` retirement or retention | Pending | Pending |
 
 ## R2 Storage

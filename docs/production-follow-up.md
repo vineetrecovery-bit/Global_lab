@@ -42,11 +42,14 @@ After deployed image rendering and admin upload both work from Hostinger:
 - Confirm the browser never receives R2 credentials, signed URLs, or permanent R2 object URLs.
 - Keep the R2 bucket private.
 
-## 5. Migration Cleanup Later
+## 5. Migration Cleanup
 
-Only after production is stable and rollback is no longer needed:
+Completed after production migration was accepted:
 
-- Decide whether to keep or remove Appwrite backup/migration scripts.
-- If scripts are removed, remove the `appwrite` dev dependency.
-- Keep ignored local backups out of Git.
+- Appwrite backup/migration scripts were removed from the repo.
+- The `appwrite` dev dependency was removed.
+- Ignored local backups remain outside Git and should not be committed.
+
+Still pending:
+
 - Merge into `main` only after deployed testing and follow-up risk review are complete.
