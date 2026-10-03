@@ -16,7 +16,13 @@ Use synthetic fixtures and never copy `.env` values, credentials, private
 records, or original certificate files into code, tests, logs, or documentation.
 Do not mutate production data or infrastructure without explicit user authority.
 
-Run the required checks and focused tests before reporting completion. When a
-durable architectural rule changes, update `Architecture.md` in the same patch.
-When deployment or recovery evidence changes, update
+Do not run the full validation suite (`npm run verify:local`, lint, the full test
+suite, schema validation, build, or typecheck) for routine edits or before every
+response. Run those required checks only immediately before pushing code, or
+when the user explicitly asks for them. During normal implementation, use only
+a narrowly focused check when it is necessary to diagnose the requested change;
+otherwise leave validation for the pre-push step.
+
+When a durable architectural rule changes, update `Architecture.md` in the same
+patch. When deployment or recovery evidence changes, update
 `docs/operational-handover.md`.
