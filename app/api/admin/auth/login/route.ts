@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminSessionResponse, verifyAdminCredentials } from '@/lib/admin-auth'
+import {
+  createAdminSessionResponse,
+  isLoginThrottled,
+  loginThrottleKey,
+  recordLoginFailure,
+  recordLoginSuccess,
+  verifyAdminCredentials,
+} from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
 
@@ -8,10 +15,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const email = typeof body.email === 'string' ? body.email : ''
     const password = typeof body.password === 'string' ? body.password : ''
+    const throttleKey = loginThrottleKey(request, email)
 
-    if (!email || !password || !verifyAdminCredentials(email, password)) {
+    if (isLoginThrottled(throttleKey)) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
+
+    if (!email || !password || !verifyAdminCredentials(email, password)) {
+      recordLoginFailure(throttleKey)
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    }
+
+    recordLoginSuccess(throttleKey)
 
     return createAdminSessionResponse(email.trim().toLowerCase())
   } catch (error) {

@@ -2,7 +2,17 @@ import Image from 'next/image'
 import { ArrowUpRight } from 'lucide-react'
 import { Reveal } from '@/components/reveal'
 
-const certificates = [
+type SampleCertificate = {
+  number: string
+  productName: string
+  category: string
+  origin: string
+  image: string
+  weight?: string
+  issueDate?: string
+}
+
+const certificates: SampleCertificate[] = [
   {
     number: 'GL-12-1',
     productName: '3 Mukhi Rudraksha',
@@ -67,12 +77,14 @@ export function SampleReports() {
                     {cert.number}
                   </p>
                   <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-                    <span className="text-xs text-muted-foreground">
-                      {cert.weight} · {cert.issueDate}
-                    </span>
+                    {(cert.weight || cert.issueDate) && (
+                      <span className="text-xs text-muted-foreground">
+                        {[cert.weight, cert.issueDate].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
                     <a
                       href="#verification"
-                      className="flex items-center gap-1 text-sm font-medium text-foreground transition-colors hover:text-gold"
+                      className="ml-auto flex items-center gap-1 text-sm font-medium text-foreground transition-colors hover:text-gold"
                     >
                       View Report
                       <ArrowUpRight className="h-4 w-4" />

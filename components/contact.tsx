@@ -1,8 +1,9 @@
-'use client'
-
-import { useState, type FormEvent } from 'react'
-import { MapPin, Mail, Check } from 'lucide-react'
+import { MapPin, Mail } from 'lucide-react'
 import { Reveal } from '@/components/reveal'
+
+const contactEmail = 'Globallab.info.in@gmail.com'
+const contactHref =
+  `mailto:${contactEmail}?subject=${encodeURIComponent('Global Lab certification enquiry')}`
 
 const info = [
   {
@@ -10,18 +11,10 @@ const info = [
     label: 'Address',
     value: 'Global LabJaipur, Rajasthan, India',
   },
-  { icon: Mail, label: 'Email', value: 'Globallab.info.in@gmail.com' },
+  { icon: Mail, label: 'Email', value: contactEmail },
 ]
 
 export function Contact() {
-  const [sent, setSent] = useState(false)
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    setSent(true)
-    setTimeout(() => setSent(false), 4000)
-  }
-
   return (
     <section id="contact" className="bg-background py-24 lg:py-32">
       <div className="mx-auto grid max-w-7xl gap-16 px-6 lg:grid-cols-2 lg:px-10">
@@ -55,86 +48,20 @@ export function Contact() {
         </Reveal>
 
         <Reveal delay={150}>
-          <form
-            onSubmit={handleSubmit}
-            className="rounded-lg border border-border bg-card p-8 shadow-sm"
-          >
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Full Name" id="name" placeholder="Your name" />
-              <Field
-                label="Email"
-                id="email"
-                type="email"
-                placeholder="you@email.com"
-              />
-            </div>
-            <div className="mt-5">
-              <Field
-                label="Subject"
-                id="subject"
-                placeholder="How can we help?"
-              />
-            </div>
-            <div className="mt-5">
-              <label
-                htmlFor="message"
-                className="text-xs uppercase tracking-wide text-muted-foreground"
-              >
-                Message
-              </label>
-              <textarea
-                id="message"
-                rows={4}
-                required
-                placeholder="Write your message…"
-                className="mt-2 w-full resize-none rounded-md border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
-              />
-            </div>
-            <button
-              type="submit"
+          <div className="rounded-lg border border-border bg-card p-8 shadow-sm">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Send your enquiry directly to our certification team. Your email
+              app will open with the laboratory address and subject filled in.
+            </p>
+            <a
+              href={contactHref}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-primary px-6 py-4 text-sm font-medium tracking-wide text-primary-foreground transition-all duration-300 hover:bg-gold hover:text-gold-foreground"
             >
-              {sent ? (
-                <>
-                  <Check className="h-4 w-4" /> Message Sent
-                </>
-              ) : (
-                'Send Message'
-              )}
-            </button>
-          </form>
+              <Mail className="h-4 w-4" /> Email Certification Team
+            </a>
+          </div>
         </Reveal>
       </div>
     </section>
-  )
-}
-
-function Field({
-  label,
-  id,
-  type = 'text',
-  placeholder,
-}: {
-  label: string
-  id: string
-  type?: string
-  placeholder?: string
-}) {
-  return (
-    <div>
-      <label
-        htmlFor={id}
-        className="text-xs uppercase tracking-wide text-muted-foreground"
-      >
-        {label}
-      </label>
-      <input
-        id={id}
-        type={type}
-        required
-        placeholder={placeholder}
-        className="mt-2 w-full rounded-md border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
-      />
-    </div>
   )
 }

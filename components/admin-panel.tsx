@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   X, LogOut, Plus, Trash2, Pencil, Save, Upload,
-  Shield, Loader2, Check, AlertCircle, Search
+  Shield, Loader2, AlertCircle, Search
 } from 'lucide-react'
 import * as admin from '@/lib/admin'
+import { csvRowToDocument, getCsvMapping as mapCsvHeaders } from '@/lib/csv-import'
+import { parseCSV, type ParsedCSV } from '@/lib/csv'
 
 type Mode = 'closed' | 'login' | 'panel'
 
@@ -19,6 +21,7 @@ interface ColumnInfo {
 
 type UploadedImagePayload = {
   objectKey: string
+  attachmentToken: string
   originalName: string
   thumbnailDataUrl?: string
 }
@@ -191,24 +194,35 @@ function RowsTab() {
   const [loading, setLoading] = useState(true)
   const [formMode, setFormMode] = useState<null | 'add' | { edit: any }>(null)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(50)
+  const [totalRows, setTotalRows] = useState(0)
+  const hasLoadedRef = useRef(false)
+  const searchDebounceReadyRef = useRef(false)
 
   // CSV state
   const [csvModal, setCsvModal] = useState(false)
-  const [csvData, setCsvData] = useState<{ headers: string[]; rows: string[][] } | null>(null)
+  const [csvData, setCsvData] = useState<ParsedCSV | null>(null)
   const [csvFileName, setCsvFileName] = useState('')
   const [csvImporting, setCsvImporting] = useState(false)
   const [csvProgress, setCsvProgress] = useState({ done: 0, failed: 0, total: 0 })
+  const [csvRowErrors, setCsvRowErrors] = useState<string[]>([])
   const [csvDone, setCsvDone] = useState(false)
   const csvInputRef = useRef<HTMLInputElement>(null)
+  const csvStopRef = useRef(false)
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = useCallback(async (nextPage = page, nextSearch = search) => {
+    if (!hasLoadedRef.current) {
+      setLoading(true)
+    }
     try {
-      const [docs, attrs] = await Promise.all([
-        admin.getAllDocuments(),
+      const [list, attrs] = await Promise.all([
+        admin.getDocumentsPage({ page: nextPage, pageSize, search: nextSearch }),
         admin.getAttributes(),
       ])
-      setDocuments(docs)
+      setDocuments(list.documents)
+      setPage(list.page)
+      setTotalRows(list.total)
       setColumns(
         attrs.map((a: any) => ({
           key: a.key,
@@ -221,17 +235,31 @@ function RowsTab() {
     } catch (err) {
       console.error(err)
     } finally {
+      hasLoadedRef.current = true
       setLoading(false)
     }
-  }
+  }, [page, pageSize, search])
 
   useEffect(() => { fetchData() }, [])
+
+  useEffect(() => {
+    if (!searchDebounceReadyRef.current) {
+      searchDebounceReadyRef.current = true
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      fetchData(1, search)
+    }, 500)
+
+    return () => window.clearTimeout(timeout)
+  }, [fetchData, search])
 
   const handleDelete = async (docId: string) => {
     if (!confirm('Delete this row? This cannot be undone.')) return
     try {
       await admin.deleteDocument(docId)
-      fetchData()
+      fetchData(page, search)
     } catch (err: any) {
       alert(err?.message || 'Failed to delete')
     }
@@ -246,9 +274,13 @@ function RowsTab() {
     reader.onload = (ev) => {
       const text = ev.target?.result as string
       const parsed = parseCSV(text)
+      if (parsed.rows.length > 500) {
+        parsed.errors.push({ row: 0, message: 'CSV import is limited to 500 rows at a time' })
+      }
       setCsvData(parsed)
       setCsvModal(true)
       setCsvDone(false)
+      setCsvRowErrors([])
       setCsvProgress({ done: 0, failed: 0, total: 0 })
     }
     reader.readAsText(file)
@@ -257,56 +289,59 @@ function RowsTab() {
 
   const handleCsvImport = async () => {
     if (!csvData) return
+    if (csvData.errors.length > 0) {
+      alert('Fix the CSV errors before importing.')
+      return
+    }
+    csvStopRef.current = false
     setCsvImporting(true)
     setCsvDone(false)
+    setCsvRowErrors([])
     const columnKeys = columns.map((c) => c.key)
     const total = csvData.rows.length
     let done = 0
     let failed = 0
     setCsvProgress({ done: 0, failed: 0, total })
 
-    for (const row of csvData.rows) {
-      const doc: Record<string, unknown> = {}
-      csvData.headers.forEach((header, i) => {
-        const matchedKey = columnKeys.find(
-          (k) => k.toLowerCase() === header.toLowerCase().trim()
-        )
-        if (matchedKey && matchedKey !== 'Certificate_photograph') {
-          doc[matchedKey] = row[i]?.trim() || ''
-        }
-      })
+    for (let rowIndex = 0; rowIndex < csvData.rows.length; rowIndex++) {
+      if (csvStopRef.current) break
+      const row = csvData.rows[rowIndex]
+      const doc = csvRowToDocument(csvData.headers, row, columnKeys)
       try {
         await admin.createDocument(doc)
         done++
-      } catch {
+      } catch (err) {
         failed++
+        const rowNumber = rowIndex + 2
+        const message = err instanceof Error ? err.message : 'Import failed'
+        setCsvRowErrors((prev) => [...prev, `Row ${rowNumber}: ${message}`])
       }
       setCsvProgress({ done, failed, total })
     }
 
     setCsvImporting(false)
     setCsvDone(true)
-    fetchData()
+    fetchData(1, search)
+  }
+
+  const closeCsvModal = () => {
+    if (csvImporting) {
+      csvStopRef.current = true
+      return
+    }
+    setCsvModal(false)
   }
 
   const getCsvMapping = () => {
     if (!csvData) return []
     const columnKeys = columns.map((c) => c.key)
-    return csvData.headers.map((h) => {
-      const matched = columnKeys.find(
-        (k) => k.toLowerCase() === h.toLowerCase().trim()
-      )
-      return { csv: h, db: matched, matched: !!matched }
-    })
+    return mapCsvHeaders(csvData.headers, columnKeys)
   }
 
-  const filtered = search
-    ? documents.filter((doc) =>
-        columns.some((col) =>
-          String(doc[col.key] || '').toLowerCase().includes(search.toLowerCase())
-        )
-      )
-    : documents
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+  const goToPage = (nextPage: number) => {
+    fetchData(Math.min(totalPages, Math.max(1, nextPage)), search)
+  }
 
   if (loading) {
     return (
@@ -341,7 +376,7 @@ function RowsTab() {
             <Upload className="h-4 w-4" /> Import CSV
           </button>
           <button
-            onClick={fetchData}
+            onClick={() => fetchData(page, search)}
             className="flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-xs text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground"
           >
             Refresh
@@ -352,9 +387,19 @@ function RowsTab() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') fetchData(1, search)
+            }}
             placeholder="Search rows..."
-            className="w-full rounded-md border border-border bg-card py-2.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+            className="w-full rounded-md border border-border bg-card py-2.5 pl-9 pr-12 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
           />
+          <button
+            type="button"
+            onClick={() => fetchData(1, search)}
+            className="absolute right-1 top-1/2 -translate-y-1/2 rounded bg-secondary px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Go
+          </button>
         </div>
       </div>
 
@@ -372,14 +417,14 @@ function RowsTab() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {documents.length === 0 ? (
               <tr>
                 <td colSpan={columns.length + 1} className="px-4 py-12 text-center text-sm text-muted-foreground">
                   {search ? 'No matching rows found.' : 'No rows yet. Click "Add Row" to create one.'}
                 </td>
               </tr>
             ) : (
-              filtered.map((doc) => (
+              documents.map((doc) => (
                 <tr key={doc.$id} className="border-b border-border/50 transition-colors hover:bg-secondary/30">
                   <td className="whitespace-nowrap px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -411,19 +456,61 @@ function RowsTab() {
         </table>
       </div>
 
-      <p className="mt-3 text-xs text-muted-foreground">{filtered.length} row(s)</p>
+      <div className="mt-3 flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <p>
+          Showing {documents.length} of {totalRows} row(s)
+          {search ? ` matching "${search}"` : ''}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => goToPage(page - 1)}
+            disabled={page <= 1}
+            className="rounded border border-border px-3 py-1 disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span>Page {page} / {totalPages}</span>
+          <button
+            type="button"
+            onClick={() => goToPage(page + 1)}
+            disabled={page >= totalPages}
+            className="rounded border border-border px-3 py-1 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      </div>
 
       {/* CSV Import Modal */}
       {csvModal && csvData && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setCsvModal(false)} />
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeCsvModal} />
           <div className="relative w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-2xl">
-            <button onClick={() => setCsvModal(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+            <button onClick={closeCsvModal} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
               <X className="h-5 w-5" />
             </button>
 
             <h3 className="font-heading text-lg font-semibold">Import CSV</h3>
             <p className="mt-1 text-xs text-muted-foreground">{csvFileName} — {csvData.rows.length} row(s)</p>
+
+            {csvData.errors.length > 0 && (
+              <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3">
+                <p className="text-xs font-medium text-destructive">CSV has errors. Import is disabled.</p>
+                <ul className="mt-2 space-y-1 text-xs text-destructive/90">
+                  {csvData.errors.slice(0, 5).map((error) => (
+                    <li key={`${error.row}-${error.message}`}>
+                      Row {error.row}: {error.message}
+                    </li>
+                  ))}
+                </ul>
+                {csvData.errors.length > 5 && (
+                  <p className="mt-2 text-xs text-destructive/80">
+                    {csvData.errors.length - 5} more error(s)
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="mt-6">
               <p className="text-xs uppercase tracking-wide text-muted-foreground mb-3">Column Mapping</p>
@@ -462,28 +549,36 @@ function RowsTab() {
 
             {csvDone && (
               <div className="mt-6 rounded-md border border-border bg-secondary/50 p-4">
-                <p className="text-sm font-medium text-foreground">Import Complete</p>
+                <p className="text-sm font-medium text-foreground">
+                  {csvProgress.done + csvProgress.failed < csvProgress.total ? 'Import Stopped' : 'Import Complete'}
+                </p>
                 <div className="mt-2 flex gap-6 text-xs">
                   <span className="text-green-500">✓ {csvProgress.done} imported</span>
                   {csvProgress.failed > 0 && (
                     <span className="text-destructive">✗ {csvProgress.failed} failed</span>
                   )}
                 </div>
+                {csvRowErrors.length > 0 && (
+                  <ul className="mt-3 max-h-28 space-y-1 overflow-y-auto text-xs text-destructive">
+                    {csvRowErrors.slice(0, 20).map((error) => (
+                      <li key={error}>{error}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
             <div className="mt-6 flex gap-3">
               <button
-                onClick={() => setCsvModal(false)}
-                disabled={csvImporting}
+                onClick={closeCsvModal}
                 className="flex-1 rounded-md border border-border px-4 py-3 text-xs font-medium text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground disabled:opacity-50"
               >
-                Close
+                {csvImporting ? 'Stop' : 'Close'}
               </button>
               {!csvDone && (
                 <button
                   onClick={handleCsvImport}
-                  disabled={csvImporting}
+                  disabled={csvImporting || csvData.errors.length > 0}
                   className="flex flex-1 items-center justify-center gap-2 rounded-md bg-gold px-4 py-3 text-xs font-medium text-gold-foreground transition-all hover:brightness-110 disabled:opacity-50"
                 >
                   {csvImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
@@ -501,7 +596,7 @@ function RowsTab() {
           columns={columns}
           editData={formMode === 'add' ? null : formMode.edit}
           onClose={() => setFormMode(null)}
-          onSave={() => { setFormMode(null); fetchData() }}
+          onSave={() => { setFormMode(null); fetchData(page, search) }}
         />
       )}
     </div>
@@ -549,6 +644,16 @@ function RowFormModal({
   const [uploadedImage, setUploadedImage] = useState<UploadedImagePayload | null>(null)
   const [removeImage, setRemoveImage] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const previewObjectUrlRef = useRef<string | null>(null)
+
+  const revokePreviewObjectUrl = useCallback(() => {
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current)
+      previewObjectUrlRef.current = null
+    }
+  }, [])
+
+  useEffect(() => revokePreviewObjectUrl, [revokePreviewObjectUrl])
 
   const handleChange = (key: string, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }))
@@ -564,10 +669,13 @@ function RowFormModal({
         createThumbnailDataUrl(file),
       ])
       const uploaded = { ...upload, thumbnailDataUrl }
+      const previewUrl = URL.createObjectURL(file)
+      revokePreviewObjectUrl()
+      previewObjectUrlRef.current = previewUrl
       setUploadedImage(uploaded)
       setRemoveImage(false)
       setFormData((prev) => ({ ...prev, Certificate_photograph: uploaded.originalName }))
-      setImagePreview(URL.createObjectURL(file))
+      setImagePreview(previewUrl)
     } catch {
       alert('Image upload failed')
     } finally {
@@ -587,6 +695,7 @@ function RowFormModal({
       })
       if (uploadedImage) cleanData.__uploadedImage = uploadedImage
       if (removeImage) cleanData.__removeImage = true
+      if (editData?.$revision) cleanData.__expectedRevision = editData.$revision
       if (editData) {
         await admin.updateDocument(editData.$id, cleanData)
       } else {
@@ -629,6 +738,7 @@ function RowFormModal({
                       <button
                         type="button"
                         onClick={() => {
+                          revokePreviewObjectUrl()
                           setImagePreview('')
                           setUploadedImage(null)
                           setRemoveImage(true)
@@ -688,60 +798,6 @@ function RowFormModal({
       </div>
     </div>
   )
-}
-
-// ===================== CSV PARSER =====================
-function parseCSV(text: string): { headers: string[]; rows: string[][] } {
-  const lines: string[] = []
-  let current = ''
-
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i]
-    if (char === '"') {
-      i++
-      while (i < text.length && text[i] !== '"') {
-        current += text[i]
-        i++
-      }
-    } else if (char === '\n') {
-      lines.push(current)
-      current = ''
-    } else if (char === '\r') {
-      // skip
-    } else {
-      current += char
-    }
-  }
-  if (current.trim()) lines.push(current)
-
-  const splitRow = (line: string): string[] => {
-    const result: string[] = []
-    let field = ''
-    let inQuotes = false
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i]
-      if (char === '"') {
-        inQuotes = !inQuotes
-      } else if (char === ',' && !inQuotes) {
-        result.push(field.trim())
-        field = ''
-      } else {
-        field += char
-      }
-    }
-    result.push(field.trim())
-    return result
-  }
-
-  const allRows = lines.map(splitRow).filter((r) => r.some((c) => c.length > 0))
-
-  if (allRows.length === 0) return { headers: [], rows: [] }
-
-  return {
-    headers: allRows[0],
-    rows: allRows.slice(1),
-  }
 }
 
 async function createThumbnailDataUrl(file: File): Promise<string | undefined> {

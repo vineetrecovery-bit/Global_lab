@@ -2,9 +2,16 @@
   "name": "my-project",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "24.x",
+    "npm": "11.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "start": "next start",
     "backup:appwrite": "node scripts/export-appwrite-backup.mjs",
     "migration:mysql": "node scripts/generate-mysql-import.mjs",
@@ -13,7 +20,11 @@
     "security:audit": "node scripts/security-audit.mjs",
     "security:fix": "node scripts/security-audit.mjs --fix",
     "security:verify": "npm audit --omit=dev && npm run build",
-    "lint": "eslint .",
+    "verify:local": "npm run lint && npm test && npm run schema:validate && npm run build && npm run typecheck",
+    "lint": "eslint . --max-warnings 27",
+    "auth:hash": "node scripts/generate-admin-password-hash.mjs",
+    "schema:validate": "node scripts/validate-schema-baseline.mjs",
+    "schema:validate:isolated": "node scripts/validate-isolated-mysql.mjs",
     "migration:validate": "node scripts/validate-migration-artifacts.mjs",
     "migration:r2-upload": "node scripts/upload-r2-from-manifest.mjs"
   },
@@ -37,8 +48,11 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "appwrite": "^26.1.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.6",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
-    "typescript": "5.7.3"
+    "typescript": "5.7.3",
+    "vitest": "5.0.3"
   }
 }

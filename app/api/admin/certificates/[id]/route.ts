@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { deleteAdminCertificate, updateAdminCertificate } from '@/lib/admin-certificates'
+import {
+  AdminCertificateConflictError,
+  AdminCertificateInputError,
+  AdminCertificateNotFoundError,
+  AdminCertificateRevisionConflictError,
+  deleteAdminCertificate,
+  updateAdminCertificate,
+} from '@/lib/admin-certificates'
 import { requireAdmin } from '@/lib/admin-auth'
 
 export const runtime = 'nodejs'
@@ -16,6 +23,18 @@ export async function PATCH(request: NextRequest) {
     const document = await updateAdminCertificate(id, body)
     return NextResponse.json({ document })
   } catch (error: any) {
+    if (error instanceof AdminCertificateInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    if (error instanceof AdminCertificateNotFoundError) {
+      return NextResponse.json({ error: error.message }, { status: 404 })
+    }
+    if (error instanceof AdminCertificateConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
+    if (error instanceof AdminCertificateRevisionConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     console.error('Admin certificates :: update error:', error)
     return NextResponse.json({ error: error?.message || 'Failed to update certificate' }, { status: 500 })
   }
@@ -32,6 +51,9 @@ export async function DELETE(request: NextRequest) {
     await deleteAdminCertificate(id)
     return NextResponse.json({ ok: true })
   } catch (error) {
+    if (error instanceof AdminCertificateNotFoundError) {
+      return NextResponse.json({ error: error.message }, { status: 404 })
+    }
     console.error('Admin certificates :: delete error:', error)
     return NextResponse.json({ error: 'Failed to delete certificate' }, { status: 500 })
   }

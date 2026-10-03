@@ -1,5 +1,6 @@
 type UploadedImage = {
   objectKey: string
+  attachmentToken: string
   originalName: string
   thumbnailDataUrl?: string
 }
@@ -45,8 +46,27 @@ export async function getAdminUser() {
 
 // ---- Documents (Rows) ----
 export async function getAllDocuments() {
-  const { documents } = await api<{ documents: any[] }>('/api/admin/certificates')
+  const { documents } = await getDocumentsPage()
   return documents
+}
+
+export async function getDocumentsPage({
+  page = 1,
+  pageSize = 50,
+  search = '',
+}: {
+  page?: number
+  pageSize?: number
+  search?: string
+} = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  })
+  if (search.trim()) params.set('search', search.trim())
+  return api<{ documents: any[]; page: number; pageSize: number; total: number }>(
+    `/api/admin/certificates?${params.toString()}`
+  )
 }
 
 export async function createDocument(data: Record<string, unknown>) {
@@ -75,18 +95,6 @@ export async function deleteDocument(docId: string) {
 export async function getAttributes() {
   const { attributes } = await api<{ attributes: any[] }>('/api/admin/certificates/attributes')
   return attributes
-}
-
-export async function addStringColumn() {
-  throw new Error('Adding columns is disabled after the MySQL migration')
-}
-
-export async function removeColumn() {
-  throw new Error('Removing columns is disabled after the MySQL migration')
-}
-
-export async function renameColumn() {
-  throw new Error('Renaming columns is disabled after the MySQL migration')
 }
 
 // ---- Storage ----

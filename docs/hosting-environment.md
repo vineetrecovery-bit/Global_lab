@@ -28,3 +28,5 @@ Backups Location: Singapore
 - Hostinger and R2 being in different nearby Asian locations should mainly affect latency, not R2 egress billing.
 - Cloudflare R2 egress is free; billing is mainly storage plus Class A/Class B operations.
 - Since the Hostinger server is in India and backups are in Singapore, `Asia-Pacific / apac` is the best R2 location hint for this project.
+- Production release evidence, restore ownership and retirement decisions are
+  tracked in `docs/operational-handover.md`.

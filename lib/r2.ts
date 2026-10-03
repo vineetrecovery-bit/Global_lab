@@ -11,6 +11,8 @@ type PutObjectOptions = {
   contentType: string
 }
 
+const R2_TIMEOUT_MS = 10_000
+
 function requiredEnv(name: string): string {
   const value = process.env[name]
   if (!value) {
@@ -28,6 +30,7 @@ export async function fetchR2Object({ objectKey }: SignedGetOptions): Promise<Re
 
   const response = await fetch(url, {
     method: 'GET',
+    signal: AbortSignal.timeout(R2_TIMEOUT_MS),
     headers: signedGetHeaders({
       accessKeyId: requiredEnv('R2_ACCESS_KEY_ID'),
       secretAccessKey: requiredEnv('R2_SECRET_ACCESS_KEY'),
@@ -50,6 +53,7 @@ export async function putR2Object({ objectKey, body, contentType }: PutObjectOpt
 
   return fetch(url, {
     method: 'PUT',
+    signal: AbortSignal.timeout(R2_TIMEOUT_MS),
     headers: signedPutHeaders({
       accessKeyId: requiredEnv('R2_ACCESS_KEY_ID'),
       secretAccessKey: requiredEnv('R2_SECRET_ACCESS_KEY'),

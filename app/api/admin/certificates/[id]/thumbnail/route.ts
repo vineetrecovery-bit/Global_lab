@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': thumbnail.thumbnail_mime,
         'Content-Length': String(thumbnail.thumbnail_size_bytes),
-        'Cache-Control': 'private, max-age=300',
+        'Cache-Control': request.nextUrl.searchParams.has('v')
+          ? 'private, max-age=3600'
+          : 'no-store',
       },
     })
   } catch (error) {

@@ -1,69 +1,17 @@
 'use client'
 
-import { useState, useEffect, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Search } from 'lucide-react'
 import { findCertificate, type Certificate } from '@/lib/certificates'
 import { CertificateResult } from '@/components/certificate-result'
 
 export function Hero() {
-  const [query, setQuery] = useState('')
+  const [initialBatch] = useState(readBatchParam)
+  const [query, setQuery] = useState(initialBatch || '')
   const [result, setResult] = useState<Certificate | 'not-found' | null>(null)
   const [loading, setLoading] = useState(false)
 
-// // Auto-verify from shared URL (but NOT on refresh)
-//   useEffect(() => {
-//     const wasVerified = sessionStorage.getItem('verified')
-//     const params = new URLSearchParams(window.location.search)
-//     const batch = params.get('batch')
-
-//     if (batch && !wasVerified) {
-//       setQuery(batch)
-//       runVerify(batch)
-//     }
-//   }, [])
-
-//   const runVerify = async (value: string) => {
-//     if (!value.trim()) return
-
-//     setLoading(true)
-//     setResult(null)
-
-//     try {
-//       const found = await findCertificate(value)
-
-//       if (found) {
-//         setResult(found)
-//         window.history.replaceState(null, '', `?batch=${encodeURIComponent(value)}`)
-//         sessionStorage.setItem('verified', 'true')
-//       } else {
-//         setResult('not-found')
-//       }
-//     } catch (error) {
-//       console.error(error)
-//       setResult('not-found')
-//     }
-
-//     setLoading(false)
-//   }
-
-//   const handleVerify = async (e: FormEvent) => {
-//     e.preventDefault()
-//     await runVerify(query)
-//  }
-
-
-
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const batch = params.get('batch')
-    if (batch) {
-      setQuery(batch)
-      runVerify(batch)
-    }
-  }, [])
-
-  const runVerify = async (value: string) => {
+  const runVerify = useCallback(async (value: string) => {
     if (!value.trim()) return
 
     setLoading(true)
@@ -84,30 +32,18 @@ export function Hero() {
     }
 
     setLoading(false)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (initialBatch) {
+      runVerify(initialBatch)
+    }
+  }, [initialBatch, runVerify])
 
   const handleVerify = async (e: FormEvent) => {
     e.preventDefault()
     await runVerify(query)
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   return (
     <section id="home" className="relative overflow-hidden bg-primary">
       <div className="absolute inset-0">
@@ -176,4 +112,9 @@ export function Hero() {
       </div>
     </section>
   )
+}
+
+function readBatchParam() {
+  if (typeof window === 'undefined') return ''
+  return new URLSearchParams(window.location.search).get('batch') || ''
 }
