@@ -180,7 +180,7 @@ function Dashboard({ user, onLogout }: { user: any; onLogout: () => void }) {
           </button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
         <RowsTab />
       </div>
     </div>
@@ -211,7 +211,7 @@ function RowsTab() {
   const csvInputRef = useRef<HTMLInputElement>(null)
   const csvStopRef = useRef(false)
 
-  const fetchData = useCallback(async (nextPage = page, nextSearch = search) => {
+  const fetchData = useCallback(async (nextPage: number, nextSearch: string) => {
     if (!hasLoadedRef.current) {
       setLoading(true)
     }
@@ -238,9 +238,9 @@ function RowsTab() {
       hasLoadedRef.current = true
       setLoading(false)
     }
-  }, [page, pageSize, search])
+  }, [pageSize])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData(1, '') }, [fetchData])
 
   useEffect(() => {
     if (!searchDebounceReadyRef.current) {
@@ -352,9 +352,9 @@ function RowsTab() {
   }
 
   return (
-    <div>
+    <div className="flex h-full min-h-0 flex-col">
       {/* Toolbar */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex shrink-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setFormMode('add')}
@@ -404,7 +404,7 @@ function RowsTab() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-border">
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-secondary/50">
@@ -456,7 +456,7 @@ function RowsTab() {
         </table>
       </div>
 
-      <div className="mt-3 flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-3 flex shrink-0 flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>
           Showing {documents.length} of {totalRows} row(s)
           {search ? ` matching "${search}"` : ''}

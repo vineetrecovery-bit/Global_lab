@@ -1,4 +1,31 @@
-const PUBLIC_FIELDS = ['PRODUCT_NAME', 'CATEGORY'] as const
+// Keep this list explicit: database metadata and newly-added columns must never
+// become public certificate data by accident. This is the reviewed certificate
+// attribute set retained in the migration schema metadata.
+const PUBLIC_FIELDS = [
+  'TYPE',
+  'CATEGORY',
+  'PRODUCT_NAME',
+  'WEIGHT',
+  'DIMENSIONS',
+  'SHAPE',
+  'CUT',
+  'COLOR',
+  'MATERIAL',
+  'CONSTRUCTION',
+  'ORIGIN',
+  'TREATMENT',
+  'COMMENTS',
+  'CERTIFICATE_DATE',
+  'BOTANICAL_NAME',
+  'WOOD_TYPE',
+  'MUKHI',
+  'NATURAL_FACES',
+  'ARTIFICIAL_FACES',
+  'SURFACE_TEXTURE',
+  'GEM_VARIETY',
+  'TRANSPARENCY',
+  'LUSTER',
+] as const
 
 export function toPublicCertificate(row: Record<string, unknown>) {
   const certificateNo = String(row.CERTIFICATE_NO || '')
@@ -15,7 +42,7 @@ export function toPublicCertificate(row: Record<string, unknown>) {
 
   for (const key of PUBLIC_FIELDS) {
     const value = row[key]
-    if (value == null) continue
+    if (value == null || String(value).trim() === '') continue
     certificate[key] = String(value)
   }
 

@@ -16,6 +16,49 @@ describe('public certificate mapping', () => {
     expect(toPublicCertificate(syntheticCertificateRow)).not.toHaveProperty('FUTURE_INTERNAL_NOTE')
   })
 
+  it('returns every populated public certificate field', () => {
+    const certificate = toPublicCertificate(syntheticCertificateRow)
+
+    expect(Object.keys(certificate)).toEqual([
+      'CERTIFICATE_NO',
+      'Certificate_photograph',
+      'TYPE',
+      'CATEGORY',
+      'PRODUCT_NAME',
+      'WEIGHT',
+      'DIMENSIONS',
+      'SHAPE',
+      'CUT',
+      'COLOR',
+      'MATERIAL',
+      'CONSTRUCTION',
+      'ORIGIN',
+      'TREATMENT',
+      'COMMENTS',
+      'CERTIFICATE_DATE',
+      'BOTANICAL_NAME',
+      'WOOD_TYPE',
+      'MUKHI',
+      'NATURAL_FACES',
+      'ARTIFICIAL_FACES',
+      'SURFACE_TEXTURE',
+      'GEM_VARIETY',
+      'TRANSPARENCY',
+      'LUSTER',
+    ])
+  })
+
+  it('omits public fields that have no data', () => {
+    const certificate = toPublicCertificate({
+      ...syntheticCertificateRow,
+      DIMENSIONS: '   ',
+      ORIGIN: null,
+    })
+
+    expect(certificate).not.toHaveProperty('DIMENSIONS')
+    expect(certificate).not.toHaveProperty('ORIGIN')
+  })
+
   it('adds a content version when updated_at is available', () => {
     const certificate = toPublicCertificate({
       ...syntheticCertificateRow,
