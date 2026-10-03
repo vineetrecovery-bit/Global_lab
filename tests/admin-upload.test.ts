@@ -32,6 +32,7 @@ afterEach(() => {
   } else {
     process.env.ADMIN_PASSWORD_HASH = originalAdminPasswordHash
   }
+  vi.restoreAllMocks()
 })
 
 describe('admin upload route validation', () => {
@@ -65,12 +66,76 @@ describe('admin upload route validation', () => {
     formData.append('certificateNo', 'TEST-42')
 
     const response = await POST(authenticatedUploadRequest(formData))
+    const responseBody = await response.json()
 
     expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toEqual({ error: 'Unsupported image file' })
+    expect(responseBody).toEqual({
+      error: 'Unsupported image file',
+      requestId: expect.any(String),
+    })
+    expect(response.headers.get('x-request-id')).toBe(responseBody.requestId)
     expect(putR2Object).not.toHaveBeenCalled()
   })
+
+  it('does not expose an unsuccessful R2 response body', async () => {
+    setSyntheticAuthEnv()
+    const providerDetail = 'synthetic-provider-detail-that-must-stay-server-side'
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.mocked(putR2Object).mockResolvedValue(
+      new Response(providerDetail, { status: 503 })
+    )
+    const formData = validUploadFormData()
+
+    const response = await POST(authenticatedUploadRequest(formData))
+    const body = await response.json()
+
+    expect(response.status).toBe(502)
+    expect(body).toEqual({
+      error: 'Image upload is temporarily unavailable',
+      requestId: expect.any(String),
+    })
+    expect(response.headers.get('x-request-id')).toBe(body.requestId)
+    expect(JSON.stringify(body)).not.toContain(providerDetail)
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain(providerDetail)
+    expect(errorLog).toHaveBeenCalledWith('Admin upload :: R2 upstream error:', {
+      requestId: body.requestId,
+      status: 503,
+    })
+  })
+
+  it('does not expose a thrown R2 client error', async () => {
+    setSyntheticAuthEnv()
+    const providerDetail = 'synthetic-signed-request-detail-that-must-not-leak'
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    vi.mocked(putR2Object).mockRejectedValue(new Error(providerDetail))
+
+    const response = await POST(authenticatedUploadRequest(validUploadFormData()))
+    const body = await response.json()
+
+    expect(response.status).toBe(503)
+    expect(body).toEqual({
+      error: 'Image upload is temporarily unavailable',
+      requestId: expect.any(String),
+    })
+    expect(response.headers.get('x-request-id')).toBe(body.requestId)
+    expect(JSON.stringify(body)).not.toContain(providerDetail)
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain(providerDetail)
+    expect(errorLog).toHaveBeenCalledWith('Admin upload :: R2 error:', {
+      requestId: body.requestId,
+      errorName: 'Error',
+    })
+  })
 })
+
+function validUploadFormData() {
+  const formData = new FormData()
+  formData.append(
+    'file',
+    new File([png(1, 1)], 'certificate.png', { type: 'image/png' })
+  )
+  formData.append('certificateNo', 'TEST-42')
+  return formData
+}
 
 function authenticatedUploadRequest(formData: FormData) {
   const cookie = createAdminSessionResponse('admin@example.test')

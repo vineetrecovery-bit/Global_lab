@@ -6,6 +6,7 @@ import {
   listAdminCertificates,
 } from '@/lib/admin-certificates'
 import { requireAdmin } from '@/lib/admin-auth'
+import { jsonError, requestId } from '@/lib/http-response'
 
 export const runtime = 'nodejs'
 
@@ -28,18 +29,23 @@ export async function POST(request: NextRequest) {
   const unauthorized = requireAdmin(request)
   if (unauthorized) return unauthorized
 
+  const id = requestId()
+
   try {
     const body = await request.json()
     const document = await createAdminCertificate(body)
     return NextResponse.json({ document }, { status: 201 })
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof AdminCertificateInputError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
     if (error instanceof AdminCertificateConflictError) {
       return NextResponse.json({ error: error.message }, { status: 409 })
     }
-    console.error('Admin certificates :: create error:', error)
-    return NextResponse.json({ error: error?.message || 'Failed to create certificate' }, { status: 500 })
+    console.error('Admin certificates :: create error:', {
+      requestId: id,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    })
+    return jsonError('Failed to create certificate', 500, id)
   }
 }

@@ -64,9 +64,7 @@ export async function GET(request: NextRequest) {
         'Content-Type': contentTypeForObjectKey(objectKey),
         'Content-Disposition': 'inline',
         'X-Content-Type-Options': 'nosniff',
-        'Cache-Control': request.nextUrl.searchParams.has('v')
-          ? 'public, max-age=31536000, immutable'
-          : 'no-store',
+        'Cache-Control': 'no-store',
       },
     })
   } catch (error) {

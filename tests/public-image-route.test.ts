@@ -44,18 +44,23 @@ describe('public certificate image route headers', () => {
     expect(response.headers.get('cache-control')).toBe('no-store')
   })
 
-  it('serves versioned stored objects with immutable cache headers', async () => {
+  it.each([
+    'v=2026-10-02',
+    'v=arbitrary-unverified-value',
+    'v=',
+  ])('does not grant immutable caching for an unverified query parameter: %s', async (query) => {
     vi.mocked(getMysqlPool).mockReturnValue({
       execute: vi.fn().mockResolvedValue([[{ r2_object_key: 'certificates/test.jpg' }]]),
     } as never)
     vi.mocked(fetchR2Object).mockResolvedValue(new Response('jpeg', { status: 200 }))
 
     const response = await GET(
-      new NextRequest('http://localhost/api/certificates/TEST-42/image?v=2026-10-02')
+      new NextRequest(`http://localhost/api/certificates/TEST-42/image?${query}`)
     )
 
     expect(response.status).toBe(200)
-    expect(response.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('cache-control')).not.toContain('immutable')
   })
 
   it('distinguishes upstream R2 failures from missing images', async () => {

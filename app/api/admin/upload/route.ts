@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin-auth'
+import { jsonError, requestId } from '@/lib/http-response'
 import { putR2Object } from '@/lib/r2'
 import { createUploadAttachmentToken } from '@/lib/upload-attachment'
 import { objectKeyForUpload } from '@/lib/upload-key'
@@ -11,11 +12,13 @@ export async function POST(request: NextRequest) {
   const unauthorized = requireAdmin(request)
   if (unauthorized) return unauthorized
 
+  const id = requestId()
+
   try {
     const formData = await request.formData()
     const file = formData.get('file')
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Image file is required' }, { status: 400 })
+      return jsonError('Image file is required', 400, id)
     }
 
     const body = Buffer.from(await file.arrayBuffer())
@@ -27,20 +30,30 @@ export async function POST(request: NextRequest) {
     const response = await putR2Object({ objectKey, body, contentType: validated.contentType })
 
     if (!response.ok) {
-      const text = await response.text().catch(() => '')
-      throw new Error(`R2 upload failed with ${response.status}: ${text.slice(0, 200)}`)
+      await response.body?.cancel().catch(() => undefined)
+      console.error('Admin upload :: R2 upstream error:', {
+        requestId: id,
+        status: response.status,
+      })
+      return jsonError('Image upload is temporarily unavailable', 502, id)
     }
 
-    return NextResponse.json({
-      objectKey,
-      attachmentToken: createUploadAttachmentToken(objectKey),
-      originalName: file.name || objectKey,
-    })
-  } catch (error: any) {
+    return NextResponse.json(
+      {
+        objectKey,
+        attachmentToken: createUploadAttachmentToken(objectKey),
+        originalName: file.name || objectKey,
+      },
+      { headers: { 'X-Request-ID': id } }
+    )
+  } catch (error) {
     if (error instanceof UploadValidationError) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return jsonError(error.message, 400, id)
     }
-    console.error('Admin upload :: R2 error:', error)
-    return NextResponse.json({ error: error?.message || 'Image upload failed' }, { status: 500 })
+    console.error('Admin upload :: R2 error:', {
+      requestId: id,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    })
+    return jsonError('Image upload is temporarily unavailable', 503, id)
   }
 }
