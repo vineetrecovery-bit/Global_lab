@@ -29,4 +29,4 @@ npm run schema:validate:isolated
 
 Only run the isolated validator against a disposable database. Production
 schema/storage migrations still require the backup/restore and deployment
-evidence tracked in `docs/ARCHITECTURE_AUDIT.md`.
+evidence tracked in `docs/operational-handover.md`.

@@ -46,8 +46,9 @@ Deployment metadata:
 
 ## Migration Baseline
 
-This baseline comes from `docs/migration-plan.md` and
-`migrations/001_schema_baseline.sql`; it is not raw production data.
+This baseline comes from the completed migration record and
+`migrations/001_schema_baseline.sql`; it is not raw production data. The bulky
+historical migration plan was removed after successful migration.
 
 | Item | Baseline |
 |---|---|
