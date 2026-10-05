@@ -94,6 +94,28 @@ Record exact command output summaries from the release branch.
 | `npm run build` | Passed on Hostinger with Next.js 16.3.6; production build compiled successfully in 12.6s and generated 10 static pages |
 | `npm run typecheck` | Not run as a separate gate; Hostinger log says build skipped validation of types |
 
+## Runtime Logs
+
+The application writes one-line JSON events to the Node.js process streams so
+Hostinger can show them under the application's **Runtime Logs** view after the
+revision is deployed. A deployment made before Hostinger enabled runtime logs
+may need to be redeployed once before this view starts collecting output.
+
+| Event | Outcomes and statistics | Deliberately excluded |
+|---|---|---|
+| `certificate.verify` | `verified`, `not_found`, `invalid_request`, `duplicate`, or `service_error`; request ID, certificate number when supplied, duration, verified public-field count/names, and image presence | Certificate field values, image/storage keys, file contents, IP address |
+| `auth.login` | `success`, `rejected`, `throttled`, or `service_error`; request ID and duration | Email, password, session token, IP address |
+
+Admin certificate listing, creation, editing, deletion, CSV import and upload
+actions do not emit activity logs. Existing provider-error messages in those
+routes remain error diagnostics rather than admin audit events.
+
+To verify a deployment, open **Websites → Dashboard** for the domain, select
+**Runtime Logs**, trigger one synthetic certificate verification and one login,
+then filter/search for `certificate.verify` and `auth.login`. Informational
+events are written to stdout; warnings and errors are written to stderr. Use
+the event `outcome` values for counts and `durationMs` for latency summaries.
+
 ## Smoke Checks
 
 Run with synthetic records only unless a production owner explicitly approves a
