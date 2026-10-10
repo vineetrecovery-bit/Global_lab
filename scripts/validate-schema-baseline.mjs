@@ -38,6 +38,8 @@ if (!baseline) {
     'CREATE TABLE IF NOT EXISTS `certificates`',
     '`id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT',
     '`CERTIFICATE_NO` VARCHAR(64) NOT NULL',
+    '`PRODUCT_NAME` VARCHAR(64) NULL',
+    '`CATEGORY` VARCHAR(64) NULL',
     '`r2_object_key` VARCHAR(255) NULL',
     'UNIQUE KEY `uniq_appwrite_document_id` (`appwrite_document_id`)',
     'KEY `idx_certificate_no` (`CERTIFICATE_NO`)',

@@ -118,6 +118,33 @@ describe('database migration runner', () => {
     })
   })
 
+  it('accepts the original imported lengths for product name and category', async () => {
+    const metadata = compatibleBaselineMetadata()
+    const connection = fakeConnection(new Map(), metadata)
+
+    await expect(applyMigrations(connection, [
+      migration('001_schema_baseline.sql', 'baseline-checksum', ['SELECT 1']),
+    ], { databaseName: 'test', logger: silentLogger() })).resolves.toEqual({
+      appliedCount: 1,
+      totalCount: 1,
+    })
+  })
+
+  it('accepts MariaDB textual NULL metadata for nullable column defaults', async () => {
+    const metadata = compatibleBaselineMetadata()
+    metadata.columns
+      .filter((column) => column.IS_NULLABLE === 'YES' && column.COLUMN_DEFAULT === null)
+      .forEach((column) => { column.COLUMN_DEFAULT = 'NULL' })
+    const connection = fakeConnection(new Map(), metadata)
+
+    await expect(applyMigrations(connection, [
+      migration('001_schema_baseline.sql', 'baseline-checksum', ['SELECT 1']),
+    ], { databaseName: 'test', logger: silentLogger() })).resolves.toEqual({
+      appliedCount: 1,
+      totalCount: 1,
+    })
+  })
+
   it('rejects a baseline whose timestamp defaults are missing', async () => {
     const metadata = compatibleBaselineMetadata()
     metadata.columns.find((column) => (
@@ -251,8 +278,8 @@ function compatibleBaselineMetadata({ legacyIntegerWidths = false } = {}) {
     column('certificates', 'appwrite_document_id', 'varchar(64)', 'NO', text),
     column('certificates', 'CERTIFICATE_NO', 'varchar(64)', 'NO', text),
     column('certificates', 'Certificate_photograph', 'varchar(255)', 'YES', text),
-    column('certificates', 'PRODUCT_NAME', 'varchar(255)', 'YES', text),
-    column('certificates', 'CATEGORY', 'varchar(128)', 'YES', text),
+    column('certificates', 'PRODUCT_NAME', 'varchar(64)', 'YES', text),
+    column('certificates', 'CATEGORY', 'varchar(64)', 'YES', text),
     column('certificates', 'r2_object_key', 'varchar(255)', 'YES', text),
     column('certificates', 'appwrite_created_at', 'datetime(3)', 'YES'),
     column('certificates', 'appwrite_updated_at', 'datetime(3)', 'YES'),

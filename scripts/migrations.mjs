@@ -294,8 +294,8 @@ function baselineSchemaErrors(metadata) {
       appwrite_document_id: { type: 'varchar(64)', nullable: 'NO', collation: 'utf8mb4_unicode_ci' },
       CERTIFICATE_NO: { type: 'varchar(64)', nullable: 'NO', collation: 'utf8mb4_unicode_ci' },
       Certificate_photograph: { type: 'varchar(255)', nullable: 'YES', collation: 'utf8mb4_unicode_ci' },
-      PRODUCT_NAME: { type: 'varchar(255)', nullable: 'YES', collation: 'utf8mb4_unicode_ci' },
-      CATEGORY: { type: 'varchar(128)', nullable: 'YES', collation: 'utf8mb4_unicode_ci' },
+      PRODUCT_NAME: { type: 'varchar(64)', nullable: 'YES', collation: 'utf8mb4_unicode_ci' },
+      CATEGORY: { type: 'varchar(64)', nullable: 'YES', collation: 'utf8mb4_unicode_ci' },
       r2_object_key: { type: 'varchar(255)', nullable: 'YES', collation: 'utf8mb4_unicode_ci' },
       appwrite_created_at: { type: 'datetime(3)', nullable: 'YES' },
       appwrite_updated_at: { type: 'datetime(3)', nullable: 'YES' },
@@ -415,5 +415,6 @@ function normalizeColumnType(type) {
 
 function normalizeDefault(value) {
   if (value === null || value === undefined) return null
-  return String(value).toLowerCase().replace(/\(\)$/, '')
+  const normalized = String(value).toLowerCase().replace(/\(\)$/, '')
+  return normalized === 'null' ? null : normalized
 }
