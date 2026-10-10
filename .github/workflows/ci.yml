@@ -65,7 +65,7 @@ jobs:
         run: npm run schema:validate:isolated
 
       - name: Build
-        run: npm run build
+        run: npm run build:app
 
       - name: Type-check generated app types
         run: npm run typecheck

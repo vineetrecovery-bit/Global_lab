@@ -23,26 +23,31 @@ routine definitions. A deployment obtains a database advisory lock, verifies all
 previous checksums, applies pending statements, and records the migration only
 after every statement succeeds.
 
-Run pending migrations against the configured database:
+Run pending migrations using environment variables already exported into the
+current process:
 
 ```bash
 npm run db:migrate
 ```
 
-The command uses environment variables already present in the process and also
-loads local `.env` / `.env.local` files when they exist. Never point a local
-migration command at production by accident.
-
-Production deployments must use:
+For deliberate local migration work, load `.env` / `.env.local` explicitly:
 
 ```bash
-npm run deploy:build
+npm run db:migrate:local
+```
+
+Never point a local migration command at production by accident.
+
+The standard production build applies migrations before compiling the app:
+
+```bash
+npm run build
 ```
 
 The command stops the deployment if the database is unavailable, the lock times
 out, a migration fails, an applied migration changed, or the database contains a
-migration absent from the checked-out release. Ordinary `npm run build` remains
-database-free for local and CI builds.
+migration absent from the checked-out release. Local verification, CI and Vercel
+use `npm run build:app`, which compiles without touching a database.
 
 Local static validation:
 

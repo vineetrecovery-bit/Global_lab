@@ -7,12 +7,12 @@ counts.
 
 ## Current Status
 
-As of 2026-10-03, the production URL, deployed Hostinger revision and migration
-baseline have been recorded. The operator stated that no production data changes
-were made after the migration/import, so the migration counts are the current
-working production counts unless a later live check proves drift. Production
-smoke results, restore ownership and retirement decisions still require
-authorized production access or an operator-provided record.
+As of 2026-10-10, Phase 1 of the migration-runner rollout is deployed. The
+runner is present but was not invoked by that release, so it made no database
+changes. The original migration counts remain historical evidence only; live row
+counts are expected to change during normal use. Production smoke results,
+restore ownership and retirement decisions still require authorized production
+access or an operator-provided record.
 
 ## Required Production Checkpoint
 
@@ -20,12 +20,12 @@ Fill this section during each production release.
 
 | Item | Value |
 |---|---|
-| Release date/time | 2026-10-02 02:03 |
+| Release date/time | 2026-10-10 (exact time not provided) |
 | Deployment owner | Rohan Chawla |
 | Deployed URL | `https://globallabtesting.in/` |
-| Deployed Git revision | `9885912f` (`Add npm security audit workflow`) |
+| Deployed Git revision | `fd78dea` (`Add deployment database migration runner`) |
 | Runtime platform/process model | Hostinger Next.js deployment; standalone server output detected; Node.js server restarted after publish |
-| Node/npm versions | Node.js 22.x / npm version not shown in Hostinger log |
+| Node/npm versions | Node.js 22.18.0 / npm 10.9.3 |
 | Database host class/provider | Pending |
 | R2 bucket/account owner | Rohan Chawla |
 | Rollback owner | Pending |
@@ -33,26 +33,27 @@ Fill this section during each production release.
 
 Deployment metadata:
 
-- Build ID: `01a0f92a-efb2-72db-918a-6191c3d20838`
+- Build ID: `01a1241d-7795-73d1-9f4e-eedf6c9478aa`
 - Source: `github.com/vineetrecovery-bit/Global_lab`, branch `main`
 - Repository field in Hostinger deployment summary: `—`
 - Root directory: `./`
 - Framework: Next.js
-- Build command recorded for the previous deployment: `npm run build`
-- Required build command for future deployments: `npm run deploy:build`
+- Phase 1 build command: `npm run build` (application-only at revision `fd78dea`)
+- Phase 2 build behavior: the same command applies migrations, then runs `build:app`
 - Output directory: `.next`
 - Environment: variables loaded from `.env`
-- Published in 1.4s; application restarted in 11.2s; deployment completed in
-  1m 25s according to the Hostinger log.
+- Published in 1.3s; application restarted in 1.8s; deployment completed in
+  1m 38s according to the Hostinger log.
 
 ## Migration Baseline
 
 Future deployments run `npm run db:migrate` before the application build through
-the `deploy:build` script. The runner serializes concurrent deployments with a
+the standard `build` script. The runner serializes concurrent deployments with a
 MySQL advisory lock and records immutable migration filenames and checksums in
-`schema_migrations`. Configure Hostinger's build command as
-`npm run deploy:build`; a failed or inconsistent migration must fail the release
-before the new application build is published.
+`schema_migrations`. Hostinger can keep its default `npm run build` command; a
+failed or inconsistent migration must fail the release before the new application
+build is published. Local verification, CI and Vercel use the database-free
+`npm run build:app` command.
 
 The first run safely adopts the existing baseline: `001_schema_baseline.sql`
 uses `CREATE TABLE IF NOT EXISTS`, then its checksum is recorded. Before that
@@ -90,9 +91,10 @@ Expected schema shape:
 - `certificate_thumbnails.certificate_id` references `certificates.id` with
   `ON DELETE CASCADE`.
 
-Current production confirmation can be limited to checking whether production
-still matches the baseline counts and required constraints if drift is suspected
-or before a schema/data migration. Do not paste or commit real certificate rows.
+Current production confirmation should verify required schema constraints and
+record live row counts only as an observational before/after snapshot. It must
+not require the historical count of 212. Do not paste or commit real certificate
+rows.
 
 ## Release Gate Results
 
@@ -100,13 +102,13 @@ Record exact command output summaries from the release branch.
 
 | Gate | Result |
 |---|---|
-| `npm ci` | Not run by Hostinger; deployment used `npm install` and installed 370 packages with 0 reported vulnerabilities |
+| `npm ci` | Not run by Hostinger; Phase 1 used `npm install`, installed 627 packages and reported 13 audit findings (1 moderate, 11 high, 1 critical) |
 | `npm run lint` | Not shown in Hostinger deployment log |
 | `npm test` | Not shown in Hostinger deployment log |
 | `npm run schema:validate` | Not shown in Hostinger deployment log |
 | `npm run schema:validate:isolated` | Not shown in Hostinger deployment log |
-| `npm run build` | Passed on Hostinger with Next.js 16.3.6; production build compiled successfully in 12.6s and generated 10 static pages |
-| `npm run typecheck` | Not run as a separate gate; Hostinger log says build skipped validation of types |
+| `npm run build` | Phase 1 passed on Hostinger with Next.js 16.3.6; compilation completed in 13.6s and generated 10 static pages |
+| `npm run typecheck` | Not run separately; the Next.js build completed its TypeScript stage in 7.8s |
 
 ## Runtime Logs
 

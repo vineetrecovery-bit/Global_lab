@@ -148,7 +148,7 @@ if (shouldFix) {
 
   if (!skipBuild) {
     console.log("Verifying production build...");
-    run("npm", ["run", "build"]);
+    run("npm", ["run", "build:app"]);
   }
 }
 
