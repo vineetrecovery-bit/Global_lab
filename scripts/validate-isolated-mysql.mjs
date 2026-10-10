@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import mysql from 'mysql2/promise'
+import { applyMigrations, loadMigrations } from './migrations.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const repoRoot = path.resolve(path.dirname(__filename), '..')
@@ -39,32 +39,25 @@ try {
   await connection.query('SET FOREIGN_KEY_CHECKS = 0')
   await connection.query('DROP TABLE IF EXISTS `certificate_thumbnails`')
   await connection.query('DROP TABLE IF EXISTS `certificates`')
+  await connection.query('DROP TABLE IF EXISTS `schema_migrations`')
   await connection.query('SET FOREIGN_KEY_CHECKS = 1')
 
-  const files = (await readdir(migrationsDir))
-    .filter((file) => /^\d+_.+\.sql$/.test(file))
-    .sort()
-
-  for (const file of files) {
-    const sql = await readFile(path.join(migrationsDir, file), 'utf8')
-    for (const statement of splitStatements(sql)) {
-      await connection.query(statement)
-    }
+  const migrations = await loadMigrations(migrationsDir)
+  const firstRun = await applyMigrations(connection, migrations, {
+    databaseName: process.env.MYSQL_DATABASE,
+  })
+  const secondRun = await applyMigrations(connection, migrations, {
+    databaseName: process.env.MYSQL_DATABASE,
+  })
+  if (firstRun.appliedCount !== migrations.length || secondRun.appliedCount !== 0) {
+    throw new Error('isolated mysql: migration ledger idempotency check failed')
   }
 
   await assertTables()
   await assertSyntheticWorkflow()
-  console.log(`isolated mysql: applied ${files.length} migration file(s) and passed synthetic schema smoke.`)
+  console.log(`isolated mysql: applied ${migrations.length} migration file(s) and passed synthetic schema smoke.`)
 } finally {
   await connection.end()
-}
-
-function splitStatements(sql) {
-  return sql
-    .replace(/^--.*$/gm, '')
-    .split(';')
-    .map((statement) => statement.trim())
-    .filter(Boolean)
 }
 
 async function assertTables() {
@@ -73,13 +66,13 @@ async function assertTables() {
       'SELECT TABLE_NAME',
       'FROM INFORMATION_SCHEMA.TABLES',
       'WHERE TABLE_SCHEMA = DATABASE()',
-      'AND TABLE_NAME IN (?, ?)',
+      'AND TABLE_NAME IN (?, ?, ?)',
       'ORDER BY TABLE_NAME',
     ].join(' '),
-    ['certificate_thumbnails', 'certificates']
+    ['certificate_thumbnails', 'certificates', 'schema_migrations']
   )
   const names = rows.map((row) => row.TABLE_NAME)
-  if (names.join(',') !== 'certificate_thumbnails,certificates') {
+  if (names.join(',') !== 'certificate_thumbnails,certificates,schema_migrations') {
     throw new Error(`isolated mysql: missing expected tables, found ${names.join(',') || 'none'}`)
   }
 }

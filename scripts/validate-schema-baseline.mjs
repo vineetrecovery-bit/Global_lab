@@ -3,13 +3,14 @@
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { MIGRATION_FILE_PATTERN } from './migrations.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const repoRoot = path.resolve(path.dirname(__filename), '..')
 const migrationsDir = path.join(repoRoot, 'migrations')
 
 const files = (await readdir(migrationsDir))
-  .filter((file) => /^\d+_.+\.sql$/.test(file))
+  .filter((file) => file.endsWith('.sql'))
   .sort()
 
 const errors = []
@@ -19,6 +20,9 @@ if (files.length === 0) {
 }
 
 files.forEach((file, index) => {
+  if (!MIGRATION_FILE_PATTERN.test(file)) {
+    errors.push(`Invalid migration filename: ${file}.`)
+  }
   const expectedPrefix = String(index + 1).padStart(3, '0')
   if (!file.startsWith(`${expectedPrefix}_`)) {
     errors.push(`Migration order gap: expected ${expectedPrefix}_..., found ${file}.`)

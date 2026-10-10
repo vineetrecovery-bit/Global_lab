@@ -38,13 +38,27 @@ Deployment metadata:
 - Repository field in Hostinger deployment summary: `—`
 - Root directory: `./`
 - Framework: Next.js
-- Build command: `npm run build`
+- Build command recorded for the previous deployment: `npm run build`
+- Required build command for future deployments: `npm run deploy:build`
 - Output directory: `.next`
 - Environment: variables loaded from `.env`
 - Published in 1.4s; application restarted in 11.2s; deployment completed in
   1m 25s according to the Hostinger log.
 
 ## Migration Baseline
+
+Future deployments run `npm run db:migrate` before the application build through
+the `deploy:build` script. The runner serializes concurrent deployments with a
+MySQL advisory lock and records immutable migration filenames and checksums in
+`schema_migrations`. Configure Hostinger's build command as
+`npm run deploy:build`; a failed or inconsistent migration must fail the release
+before the new application build is published.
+
+The first run safely adopts the existing baseline: `001_schema_baseline.sql`
+uses `CREATE TABLE IF NOT EXISTS`, then its checksum is recorded. Before that
+first production run, confirm that the live schema still matches the baseline
+and that a restorable database backup exists. This setup does not authorize
+destructive migrations or automatic R2 changes.
 
 This baseline comes from the completed migration record and
 `migrations/001_schema_baseline.sql`; it is not raw production data. The bulky

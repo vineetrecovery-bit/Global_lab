@@ -13,6 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "next start",
+    "db:migrate": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/migrate.mjs",
+    "deploy:build": "npm run db:migrate && npm run build",
     "security:audit": "node scripts/security-audit.mjs",
     "security:fix": "node scripts/security-audit.mjs --fix",
     "security:verify": "npm audit --omit=dev && npm run build",

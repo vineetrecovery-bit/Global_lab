@@ -46,6 +46,9 @@ Every change must preserve or move the code toward these rules:
 11. Schema changes are ordered migrations tested on an isolated database.
 12. Secrets, hashes, private records and file contents never enter source
     control, logs, fixtures or documentation.
+13. Deployments apply immutable, checksummed migrations before starting a new
+    application build. Concurrent migration runners are serialized, and an
+    application release stops if migration history is missing or inconsistent.
 
 ## Boundary Rules
 
