@@ -105,6 +105,19 @@ describe('database migration runner', () => {
     })
   })
 
+  it('accepts a compatible baseline when the database has no index visibility metadata', async () => {
+    const metadata = compatibleBaselineMetadata()
+    metadata.indexes.forEach((index) => delete index.IS_VISIBLE)
+    const connection = fakeConnection(new Map(), metadata, { supportsIndexVisibility: false })
+
+    await expect(applyMigrations(connection, [
+      migration('001_schema_baseline.sql', 'baseline-checksum', ['SELECT 1']),
+    ], { databaseName: 'test', logger: silentLogger() })).resolves.toEqual({
+      appliedCount: 1,
+      totalCount: 1,
+    })
+  })
+
   it('rejects a baseline whose timestamp defaults are missing', async () => {
     const metadata = compatibleBaselineMetadata()
     metadata.columns.find((column) => (
@@ -189,7 +202,11 @@ function silentLogger() {
   return { log: vi.fn(), error: vi.fn() }
 }
 
-function fakeConnection(applied, baselineMetadata = { tables: [], columns: [], indexes: [], foreignKeys: [] }) {
+function fakeConnection(
+  applied,
+  baselineMetadata = { tables: [], columns: [], indexes: [], foreignKeys: [] },
+  { supportsIndexVisibility = true } = {}
+) {
   return {
     query: vi.fn(async (sql) => {
       if (sql.startsWith('SELECT GET_LOCK')) return [[{ acquired: 1 }]]
@@ -197,8 +214,16 @@ function fakeConnection(applied, baselineMetadata = { tables: [], columns: [], i
         return [[...applied].map(([filename, checksum_sha256]) => ({ filename, checksum_sha256 }))]
       }
       if (sql.includes('INFORMATION_SCHEMA`.`TABLES')) return [baselineMetadata.tables]
+      if (sql.includes("LOWER(`COLUMN_NAME`) = 'is_visible'")) {
+        return [[{ column_count: supportsIndexVisibility ? 1 : 0 }]]
+      }
       if (sql.includes('INFORMATION_SCHEMA`.`COLUMNS')) return [baselineMetadata.columns]
-      if (sql.includes('INFORMATION_SCHEMA`.`STATISTICS')) return [baselineMetadata.indexes]
+      if (sql.includes('INFORMATION_SCHEMA`.`STATISTICS')) {
+        if (!supportsIndexVisibility && sql.includes('`SUB_PART`, `IS_VISIBLE`')) {
+          throw new Error("Unknown column 'IS_VISIBLE' in 'SELECT'")
+        }
+        return [baselineMetadata.indexes]
+      }
       if (sql.includes('INFORMATION_SCHEMA`.`KEY_COLUMN_USAGE')) return [baselineMetadata.foreignKeys]
       return [[]]
     }),

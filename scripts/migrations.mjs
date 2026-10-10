@@ -234,9 +234,19 @@ async function assertBaselineSchema(connection) {
     'WHERE `TABLE_SCHEMA` = DATABASE()',
     "AND `TABLE_NAME` IN ('certificates', 'certificate_thumbnails')",
   ].join(' '))
+  const [indexVisibilityColumns] = await connection.query([
+    'SELECT COUNT(*) AS `column_count`',
+    'FROM `INFORMATION_SCHEMA`.`COLUMNS`',
+    "WHERE LOWER(`TABLE_SCHEMA`) = 'information_schema'",
+    "AND LOWER(`TABLE_NAME`) = 'statistics'",
+    "AND LOWER(`COLUMN_NAME`) = 'is_visible'",
+  ].join(' '))
+  const indexVisibilityProjection = Number(indexVisibilityColumns[0]?.column_count) > 0
+    ? '`IS_VISIBLE`'
+    : "'YES' AS `IS_VISIBLE`"
   const [indexes] = await connection.query([
     'SELECT `TABLE_NAME`, `INDEX_NAME`, `NON_UNIQUE`, `SEQ_IN_INDEX`, `COLUMN_NAME`,',
-    '`SUB_PART`, `IS_VISIBLE`',
+    `\`SUB_PART\`, ${indexVisibilityProjection}`,
     'FROM `INFORMATION_SCHEMA`.`STATISTICS`',
     'WHERE `TABLE_SCHEMA` = DATABASE()',
     "AND `TABLE_NAME` IN ('certificates', 'certificate_thumbnails')",
