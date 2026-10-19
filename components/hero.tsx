@@ -2,13 +2,18 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Search } from 'lucide-react'
-import { findCertificate, type Certificate } from '@/lib/certificates'
+import {
+  CertificateVerificationError,
+  findCertificate,
+  type Certificate,
+  type VerificationFailure,
+} from '@/lib/certificates'
 import { CertificateResult } from '@/components/certificate-result'
 
 export function Hero() {
   const [initialBatch] = useState(readBatchParam)
   const [query, setQuery] = useState(initialBatch || '')
-  const [result, setResult] = useState<Certificate | 'not-found' | null>(null)
+  const [result, setResult] = useState<Certificate | VerificationFailure | null>(null)
   const [loading, setLoading] = useState(false)
 
   const runVerify = useCallback(async (value: string) => {
@@ -27,8 +32,7 @@ export function Hero() {
         setResult('not-found')
       }
     } catch (error) {
-      console.error(error)
-      setResult('not-found')
+      setResult(error instanceof CertificateVerificationError ? error.kind : 'unavailable')
     }
 
     setLoading(false)

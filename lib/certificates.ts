@@ -4,6 +4,15 @@ export type Certificate = {
   [key: string]: string
 }
 
+export type VerificationFailure = 'not-found' | 'invalid' | 'unauthorized' | 'conflict' | 'unavailable'
+
+export class CertificateVerificationError extends Error {
+  constructor(readonly kind: Exclude<VerificationFailure, 'not-found'>) {
+    super('Certificate verification failed')
+    this.name = 'CertificateVerificationError'
+  }
+}
+
 export async function findCertificate(
   input: string
 ): Promise<Certificate | null> {
@@ -17,7 +26,14 @@ export async function findCertificate(
 
   if (response.status === 404) return null
   if (!response.ok) {
-    throw new Error('Failed to verify certificate')
+    const kind = response.status === 400
+      ? 'invalid'
+      : response.status === 401 || response.status === 403
+        ? 'unauthorized'
+        : response.status === 409
+          ? 'conflict'
+          : 'unavailable'
+    throw new CertificateVerificationError(kind)
   }
 
   const data = (await response.json()) as { certificate: Certificate | null }

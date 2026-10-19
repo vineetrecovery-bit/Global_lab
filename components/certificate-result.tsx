@@ -2,7 +2,30 @@
 
 import Image from 'next/image'
 import { BadgeCheck, ShieldX, Hash, Tag } from 'lucide-react'
-import type { Certificate } from '@/lib/certificates'
+import type { Certificate, VerificationFailure } from '@/lib/certificates'
+
+const failureContent: Record<VerificationFailure, { title: string; message: string }> = {
+  'not-found': {
+    title: 'Match Not Found',
+    message: 'We could not locate an entry matching that verification number. Please check the number and try again.',
+  },
+  invalid: {
+    title: 'Invalid Number',
+    message: 'Please check the verification number and try again.',
+  },
+  unauthorized: {
+    title: 'Verification Restricted',
+    message: 'This certificate cannot be verified here. Please contact the certification team for help.',
+  },
+  conflict: {
+    title: 'Record Conflict',
+    message: 'This number matches more than one record. Please contact the certification team before relying on this certificate.',
+  },
+  unavailable: {
+    title: 'Verification Unavailable',
+    message: 'We could not check this certificate right now. Please try again shortly.',
+  },
+}
 
 function hasValue(val: string | null | undefined): val is string {
   return !!val && val.trim().length > 0
@@ -17,22 +40,22 @@ function formatLabel(key: string): string {
 export function CertificateResult({
   result,
 }: {
-  result: Certificate | 'not-found' | null
+  result: Certificate | VerificationFailure | null
 }) {
   if (!result) return null
 
-  if (result === 'not-found') {
+  if (typeof result === 'string') {
+    const { title, message } = failureContent[result]
     return (
-      <div className="animate-fade-up mt-8 overflow-hidden rounded-lg border border-destructive/30 bg-card/80 p-8 text-center backdrop-blur">
+      <div role="status" className="animate-fade-up mt-8 overflow-hidden rounded-lg border border-destructive/30 bg-card/80 p-8 text-center backdrop-blur">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
           <ShieldX className="h-8 w-8 text-destructive" />
         </div>
         <h3 className="font-heading mt-5 text-2xl font-semibold text-foreground">
-          Match Not Found
+          {title}
         </h3>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-          We could not locate a entry matching that verification number.
-          Please check the number and try again.
+          {message}
         </p>
       </div>
     )
