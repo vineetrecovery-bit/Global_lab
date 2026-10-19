@@ -6,6 +6,7 @@ import {
   Shield, Loader2, AlertCircle, Search
 } from 'lucide-react'
 import * as admin from '@/lib/admin'
+import { CertificateQrAction } from '@/components/certificate-qr-dialog'
 import { csvRowToDocument, getCsvMapping as mapCsvHeaders } from '@/lib/csv-import'
 import { parseCSV, type ParsedCSV } from '@/lib/csv'
 
@@ -442,6 +443,7 @@ function RowsTab() {
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
+                      <CertificateQrAction certificateNo={doc.CERTIFICATE_NO} />
                     </div>
                   </td>
                   {columns.map((col) => (
