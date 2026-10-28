@@ -106,3 +106,14 @@ export function parseCSV(text: string): ParsedCSV {
 function normalizeField(value: string, quoted: boolean) {
   return quoted ? value : value.trim()
 }
+
+export function serializeCSV(headers: string[], rows: string[][]): string {
+  const lines = [headers, ...rows].map((row) => row.map(escapeField).join(','))
+  return `﻿${lines.join('\r\n')}\r\n`
+}
+
+function escapeField(value: string) {
+  return /[",\r\n]/.test(value) || value !== value.trim()
+    ? `"${value.replace(/"/g, '""')}"`
+    : value
+}

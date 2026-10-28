@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseCSV } from '@/lib/csv'
+import { parseCSV, serializeCSV } from '@/lib/csv'
 
 describe('CSV parser', () => {
   it('parses a simple synthetic row', () => {
@@ -46,5 +46,22 @@ describe('CSV parser', () => {
       row: 2,
       message: 'Quoted field is not closed',
     })
+  })
+})
+
+describe('CSV serializer', () => {
+  it('quotes commas, quotes, newlines and padded values, and round-trips through the parser', () => {
+    const headers = ['CERTIFICATE_NO', 'PRODUCT_NAME']
+    const rows = [
+      ['TEST-1', 'red, blue'],
+      ['TEST-2', 'a "quoted" value'],
+      ['TEST-3', 'line 1\nline 2'],
+      ['TEST-4', ' padded '],
+    ]
+
+    const csv = serializeCSV(headers, rows)
+
+    expect(csv.startsWith('﻿CERTIFICATE_NO,PRODUCT_NAME\r\nTEST-1,"red, blue"\r\n')).toBe(true)
+    expect(parseCSV(csv)).toEqual({ headers, rows, errors: [] })
   })
 })

@@ -122,8 +122,11 @@ may need to be redeployed once before this view starts collecting output.
 | `certificate.verify` | `verified`, `not_found`, `invalid_request`, `duplicate`, or `service_error`; request ID, certificate number when supplied, duration, verified public-field count/names, and image presence | Certificate field values, image/storage keys, file contents, IP address |
 | `auth.login` | `success`, `rejected`, `throttled`, or `service_error`; request ID and duration | Email, password, session token, IP address |
 
-Admin certificate listing, creation, editing, deletion, CSV import and upload
-actions do not emit activity logs. Existing provider-error messages in those
+Admin certificate listing, creation, editing, deletion, CSV import, Export All
+and upload actions do not emit activity logs. Export All runs in the browser:
+it pages through the admin list API and builds the zip (CSV plus one QR PNG per
+certificate number) client-side, so no new server route or response-size limit
+is involved. Existing provider-error messages in those
 routes remain error diagnostics rather than admin audit events.
 
 To verify a deployment, open **Websites → Dashboard** for the domain, select
@@ -147,6 +150,7 @@ read-only real-record check.
 | Admin create/edit/delete synthetic row | Row changes persist; stale edit conflict is visible | Pending |
 | Admin upload/save/cancel synthetic attachment | Valid upload saves; canceled upload does not alter previous record | Pending |
 | CSV import synthetic sample | Bounded import, row-level failures visible, no duplicate successes | Pending |
+| Admin Export All | Zip contains every row in `certificates.csv` and a scannable QR per certificate number; no images or thumbnails | Pending |
 
 ## Backup And Restore
 
