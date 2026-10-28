@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
-  X, LogOut, Plus, Trash2, Pencil, Save, Upload,
+  X, LogOut, Plus, Trash2, Pencil, Save, Upload, Download,
   Shield, Loader2, AlertCircle, Search
 } from 'lucide-react'
 import * as admin from '@/lib/admin'
@@ -376,6 +376,13 @@ function RowsTab() {
           >
             <Upload className="h-4 w-4" /> Import CSV
           </button>
+          <a
+            href="/templates/certificates-import-template.csv"
+            download
+            className="flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-xs text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground"
+          >
+            <Download className="h-4 w-4" /> CSV Template
+          </a>
           <button
             onClick={() => fetchData(page, search)}
             className="flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-xs text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground"
