@@ -3,9 +3,15 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   X, LogOut, Plus, Trash2, Pencil, Save, Upload, Download,
-  Shield, Loader2, AlertCircle, Search
+  Shield, Loader2, AlertCircle, Search, FileArchive, RefreshCw, Check
 } from 'lucide-react'
 import * as admin from '@/lib/admin'
+import {
+  buildExportZip,
+  exportFileName,
+  fetchAllDocuments,
+  type ExportProgress,
+} from '@/lib/admin-export'
 import { CertificateQrAction } from '@/components/certificate-qr-dialog'
 import { csvRowToDocument, getCsvMapping as mapCsvHeaders } from '@/lib/csv-import'
 import { parseCSV, type ParsedCSV } from '@/lib/csv'
@@ -212,7 +218,21 @@ function RowsTab() {
   const csvInputRef = useRef<HTMLInputElement>(null)
   const csvStopRef = useRef(false)
 
-  const fetchData = useCallback(async (nextPage: number, nextSearch: string) => {
+  // Export state
+  const [exportModal, setExportModal] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null)
+  const [exportResult, setExportResult] = useState<{ rows: number; warning: boolean } | null>(null)
+  const [exportError, setExportError] = useState('')
+  const exportAbortRef = useRef<AbortController | null>(null)
+
+  // Refresh state
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshStatus, setRefreshStatus] = useState<null | 'updated' | 'failed'>(null)
+  const refreshStatusTimerRef = useRef<number | null>(null)
+
+  // Resolves true when the page loaded, false when the request failed.
+  const fetchData = useCallback(async (nextPage: number, nextSearch: string): Promise<boolean> => {
     if (!hasLoadedRef.current) {
       setLoading(true)
     }
@@ -233,8 +253,10 @@ function RowsTab() {
           status: a.status || 'available',
         }))
       )
+      return true
     } catch (err) {
       console.error(err)
+      return false
     } finally {
       hasLoadedRef.current = true
       setLoading(false)
@@ -333,6 +355,77 @@ function RowsTab() {
     setCsvModal(false)
   }
 
+  // Refresh handlers
+  useEffect(() => () => {
+    if (refreshStatusTimerRef.current !== null) window.clearTimeout(refreshStatusTimerRef.current)
+  }, [])
+
+  const handleRefresh = async () => {
+    if (refreshStatusTimerRef.current !== null) window.clearTimeout(refreshStatusTimerRef.current)
+    setRefreshing(true)
+    setRefreshStatus(null)
+    const ok = await fetchData(page, search)
+    setRefreshing(false)
+    setRefreshStatus(ok ? 'updated' : 'failed')
+    // Keep failures visible until the next attempt; success fades after a moment.
+    refreshStatusTimerRef.current = ok
+      ? window.setTimeout(() => setRefreshStatus(null), 2500)
+      : null
+  }
+
+  // Export handlers
+  const handleExport = async () => {
+    const controller = new AbortController()
+    exportAbortRef.current = controller
+    setExportModal(true)
+    setExporting(true)
+    setExportProgress(null)
+    setExportResult(null)
+    setExportError('')
+
+    try {
+      const options = { signal: controller.signal, onProgress: setExportProgress }
+      const { documents, changedDuringExport } = await fetchAllDocuments(
+        (nextPage, nextPageSize) => admin.getDocumentsPage({ page: nextPage, pageSize: nextPageSize }),
+        options
+      )
+      const zip = await buildExportZip(documents, columns.map((c) => c.key), options)
+
+      const url = URL.createObjectURL(new Blob([zip as BlobPart], { type: 'application/zip' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = exportFileName()
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+
+      setExportResult({ rows: documents.length, warning: changedDuringExport })
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setExportModal(false)
+      } else {
+        setExportError(err instanceof Error ? err.message : 'Export failed')
+      }
+    } finally {
+      exportAbortRef.current = null
+      setExporting(false)
+    }
+  }
+
+  const closeExportModal = () => {
+    if (exporting) {
+      exportAbortRef.current?.abort()
+      return
+    }
+    setExportModal(false)
+  }
+
+  const exportStatus = (progress: ExportProgress | null) => {
+    if (!progress) return 'Starting...'
+    if (progress.phase === 'fetching') return `Fetching rows ${progress.done} / ${progress.total}`
+    if (progress.phase === 'qr') return `Generating QR ${progress.done} / ${progress.total}`
+    return 'Building zip...'
+  }
+
   const getCsvMapping = () => {
     if (!csvData) return []
     const columnKeys = columns.map((c) => c.key)
@@ -384,11 +477,32 @@ function RowsTab() {
             <Download className="h-4 w-4" /> CSV Template
           </a>
           <button
-            onClick={() => fetchData(page, search)}
-            className="flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-xs text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground"
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-xs text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground disabled:opacity-50"
           >
-            Refresh
+            <FileArchive className="h-4 w-4" /> Export All
           </button>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-xs text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <span role="status" aria-live="polite" className="text-xs">
+            {refreshStatus === 'updated' && (
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <Check className="h-4 w-4" /> Updated
+              </span>
+            )}
+            {refreshStatus === 'failed' && (
+              <span className="flex items-center gap-1 text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" /> Couldn&apos;t refresh. Try again.
+              </span>
+            )}
+          </span>
         </div>
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -594,6 +708,60 @@ function RowsTab() {
                   {csvImporting ? 'Importing...' : 'Import'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {exportModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeExportModal} />
+          <div className="relative w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-2xl">
+            <button onClick={closeExportModal} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+              <X className="h-5 w-5" />
+            </button>
+
+            <h3 className="font-heading text-lg font-semibold">Export All</h3>
+            <p className="mt-1 text-xs text-muted-foreground">All rows as CSV plus one QR PNG per certificate, in a single zip.</p>
+
+            {exporting && (
+              <div className="mt-6">
+                <div className="mb-2 text-xs text-muted-foreground">{exportStatus(exportProgress)}</div>
+                <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full bg-gold transition-all duration-300"
+                    style={{ width: `${exportProgress?.total ? (exportProgress.done / exportProgress.total) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {exportResult && (
+              <div className="mt-6 rounded-md border border-border bg-secondary/50 p-4">
+                <p className="text-sm font-medium text-foreground">Export Complete</p>
+                <p className="mt-2 text-xs text-green-500">✓ {exportResult.rows} row(s) exported</p>
+                {exportResult.warning && (
+                  <p className="mt-2 text-xs text-yellow-500">
+                    ⚠ Rows were added or deleted while exporting. Run the export again for an exact snapshot.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {exportError && (
+              <div className="mt-6 rounded-md border border-destructive/40 bg-destructive/10 p-3">
+                <p className="text-xs text-destructive">{exportError}</p>
+              </div>
+            )}
+
+            <div className="mt-6">
+              <button
+                onClick={closeExportModal}
+                className="w-full rounded-md border border-border px-4 py-3 text-xs font-medium text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground"
+              >
+                {exporting ? 'Cancel' : 'Close'}
+              </button>
             </div>
           </div>
         </div>

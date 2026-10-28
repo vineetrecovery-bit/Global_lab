@@ -4,7 +4,11 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { QrCode, X } from 'lucide-react'
 import QRCode from 'qrcode'
-import { certificateVerificationUrl } from '@/lib/certificate-qr'
+import {
+  CERTIFICATE_QR_OPTIONS,
+  certificateQrFileName,
+  certificateVerificationUrl,
+} from '@/lib/certificate-qr'
 
 export function CertificateQrAction({ certificateNo }: { certificateNo: string | null | undefined }) {
   const [open, setOpen] = useState(false)
@@ -42,7 +46,7 @@ export function CertificateQrDialog({ certificateNo, onClose }: {
 
   useEffect(() => {
     let active = true
-    QRCode.toDataURL(url, { width: 320, margin: 2, errorCorrectionLevel: 'M' })
+    QRCode.toDataURL(url, CERTIFICATE_QR_OPTIONS)
       .then((image) => {
         if (active) setQrResult({ url, image })
       })
@@ -52,7 +56,7 @@ export function CertificateQrDialog({ certificateNo, onClose }: {
     return () => { active = false }
   }, [url])
 
-  const downloadName = `certificate-${certificateNo.replace(/[^a-z0-9._-]+/gi, '-')}.png`
+  const downloadName = certificateQrFileName(certificateNo)
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
