@@ -1,4 +1,4 @@
-# Repository instructions for coding agents
+
 
 These instructions apply to the entire repository.
 

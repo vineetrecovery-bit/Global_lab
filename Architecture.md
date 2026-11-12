@@ -1,4 +1,4 @@
-# Global Lab Architecture Guide
+
 
 Last reviewed: **2026-10-03**
 
