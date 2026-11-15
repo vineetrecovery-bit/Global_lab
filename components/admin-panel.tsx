@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   X, LogOut, Plus, Trash2, Pencil, Save, Upload, Download,
-  Shield, Loader2, AlertCircle, Search, FileArchive, RefreshCw, Check
+  Shield, Loader2, AlertCircle, Search, FileArchive, RefreshCw, Check, QrCode
 } from 'lucide-react'
 import * as admin from '@/lib/admin'
 import {
@@ -12,7 +12,7 @@ import {
   fetchAllDocuments,
   type ExportProgress,
 } from '@/lib/admin-export'
-import { CertificateQrAction } from '@/components/certificate-qr-dialog'
+import { CertificateQrAction, CertificateQrCell } from '@/components/certificate-qr-dialog'
 import { csvRowToDocument, getCsvMapping as mapCsvHeaders } from '@/lib/csv-import'
 import { parseCSV, type ParsedCSV } from '@/lib/csv'
 
@@ -202,7 +202,7 @@ function RowsTab() {
   const [formMode, setFormMode] = useState<null | 'add' | { edit: any }>(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [pageSize] = useState(50)
+  const [pageSize] = useState(25)
   const [totalRows, setTotalRows] = useState(0)
   const hasLoadedRef = useRef(false)
   const searchDebounceReadyRef = useRef(false)
@@ -227,6 +227,7 @@ function RowsTab() {
   const exportAbortRef = useRef<AbortController | null>(null)
 
   // Refresh state
+  const [showQrs, setShowQrs] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshStatus, setRefreshStatus] = useState<null | 'updated' | 'failed'>(null)
   const refreshStatusTimerRef = useRef<number | null>(null)
@@ -484,6 +485,14 @@ function RowsTab() {
             <FileArchive className="h-4 w-4" /> Export All
           </button>
           <button
+            type="button"
+            onClick={() => setShowQrs((v) => !v)}
+            aria-pressed={showQrs}
+            className={`flex items-center gap-2 rounded-md border px-4 py-2.5 text-xs transition-all ${showQrs ? 'border-gold bg-gold/10 text-gold' : 'border-border text-muted-foreground hover:border-gold/50 hover:text-foreground'}`}
+          >
+            <QrCode className="h-4 w-4" /> {showQrs ? 'Hide QRs' : 'Show QRs'}
+          </button>
+          <button
             onClick={handleRefresh}
             disabled={refreshing}
             className="flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-xs text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground disabled:opacity-50"
@@ -531,6 +540,9 @@ function RowsTab() {
           <thead>
             <tr className="border-b border-border bg-secondary/50">
               <th className="px-4 py-3 text-left text-[10px] uppercase tracking-widest text-muted-foreground">Actions</th>
+              {showQrs && (
+                <th className="px-4 py-3 text-left text-[10px] uppercase tracking-widest text-muted-foreground">QR</th>
+              )}
               {columns.map((col) => (
                 <th key={col.key} className="whitespace-nowrap px-4 py-3 text-left text-[10px] uppercase tracking-widest text-muted-foreground">
                   {col.key}
@@ -541,7 +553,7 @@ function RowsTab() {
           <tbody>
             {documents.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + 1} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                <td colSpan={columns.length + (showQrs ? 2 : 1)} className="px-4 py-12 text-center text-sm text-muted-foreground">
                   {search ? 'No matching rows found.' : 'No rows yet. Click "Add Row" to create one.'}
                 </td>
               </tr>
@@ -567,6 +579,11 @@ function RowsTab() {
                       <CertificateQrAction certificateNo={doc.CERTIFICATE_NO} />
                     </div>
                   </td>
+                  {showQrs && (
+                    <td className="px-4 py-3">
+                      <CertificateQrCell certificateNo={doc.CERTIFICATE_NO} />
+                    </td>
+                  )}
                   {columns.map((col) => (
                     <td key={col.key} className="max-w-[200px] truncate px-4 py-3 text-foreground">
                       {renderCell(col.key, doc[col.key], doc)}

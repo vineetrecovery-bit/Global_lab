@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { CertificateQrAction, CertificateQrDialog } from '@/components/certificate-qr-dialog'
+import { CertificateQrAction, CertificateQrCell, CertificateQrDialog } from '@/components/certificate-qr-dialog'
 
 describe('certificate QR admin UI', () => {
   it('shows a Generate QR action for a certificate row', () => {
@@ -27,5 +27,12 @@ describe('certificate QR admin UI', () => {
 
     expect(html).toContain('TEST/42')
     expect(html).toContain('https://globallabtesting.in/?batch=TEST%2F42')
+  })
+
+  it('shows a placeholder for a row QR cell with a number and a dash without one', () => {
+    expect(renderToStaticMarkup(createElement(CertificateQrCell, { certificateNo: 'GL-1' }))).toContain('Generating')
+    const empty = renderToStaticMarkup(createElement(CertificateQrCell, { certificateNo: '  ' }))
+    expect(empty).toContain('—')
+    expect(empty).not.toContain('Generating')
   })
 })

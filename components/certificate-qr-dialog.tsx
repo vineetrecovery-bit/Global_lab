@@ -86,3 +86,41 @@ export function CertificateQrDialog({ certificateNo, onClose }: {
     </div>
   )
 }
+
+export function CertificateQrCell({ certificateNo }: { certificateNo: string | null | undefined }) {
+  const validNumber = typeof certificateNo === 'string' && certificateNo.trim().length > 0
+  if (!validNumber) return <span className="text-muted-foreground" aria-label="No certificate number">—</span>
+  return <CertificateQrThumb certificateNo={certificateNo} />
+}
+
+function CertificateQrThumb({ certificateNo }: { certificateNo: string }) {
+  const url = certificateVerificationUrl(certificateNo)
+  const [qrResult, setQrResult] = useState<{ url: string; image: string } | null>(null)
+  const [errorUrl, setErrorUrl] = useState('')
+  const qrImage = qrResult?.url === url ? qrResult.image : ''
+  const error = errorUrl === url
+
+  useEffect(() => {
+    let active = true
+    QRCode.toDataURL(url, CERTIFICATE_QR_OPTIONS)
+      .then((image) => {
+        if (active) setQrResult({ url, image })
+      })
+      .catch(() => {
+        if (active) setErrorUrl(url)
+      })
+    return () => { active = false }
+  }, [url])
+
+  if (error) return <span role="alert" className="text-xs text-destructive">QR failed</span>
+  if (!qrImage) return <span role="status" className="text-xs text-muted-foreground">Generating…</span>
+
+  return (
+    <div className="flex w-24 flex-col items-center gap-1">
+      <Image unoptimized src={qrImage} alt={`QR code for certificate ${certificateNo}`} width={96} height={96} className="rounded bg-white" />
+      <a href={qrImage} download={certificateQrFileName(certificateNo)} className="text-[10px] text-gold hover:underline">
+        Download
+      </a>
+    </div>
+  )
+}
