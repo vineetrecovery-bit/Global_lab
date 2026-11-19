@@ -143,17 +143,17 @@ read-only real-record check.
 
 | Check | Expected result | Result |
 |---|---|---|
-| Homepage loads over HTTPS | 200, valid TLS, no mixed-content errors | Pending |
+| Homepage loads over HTTPS | 200, valid TLS, no mixed-content errors | 200 on 2026-11-19 at `d2aaa17`; only console error is the pre-existing `/_vercel/insights/script.js` 404 |
 | Public verify: known synthetic certificate | 200 with approved public fields only | Pending |
-| Public verify: missing certificate | Safe not-found response with request ID | Pending |
+| Public verify: missing certificate | Safe not-found response with request ID | 404 with `certificate: null` and request ID on 2026-11-19 |
 | Public image: synthetic certificate image | Correct content type, cache policy and bytes | Pending |
 | Admin login/logout | Login succeeds with current credential; logout invalidates session | Pending |
 | Admin create/edit/delete synthetic row | Row changes persist; stale edit conflict is visible | Pending |
 | Admin upload/save/cancel synthetic attachment | Valid upload saves; canceled upload does not alter previous record | Pending |
 | CSV import synthetic sample | Bounded import, row-level failures visible, no duplicate successes | Pending |
 | Admin Fix QR (synthetic row whose image has a wrong QR) | Preview shows current vs fixed QR; Apply attaches a new image under a new R2 key, the old object remains in R2, thumbnail refreshes, and the new QR scans to `https://globallabtesting.in/?batch=<number>` | Pending |
-| Admin edit: attach the row's own certificate | Number verified; confident values replace form values with "replaced" notes; nothing saved until Save | Pending |
-| Admin edit: attach a different row's certificate | "Certificate number mismatch" alert; form and image unchanged; no upload request | Pending |
+| Admin edit: attach the row's own certificate | Number verified; confident values replace form values with "replaced" notes; nothing saved until Save | Passed 2026-11-19 at `d2aaa17` (read-only real row; upload stubbed, not saved) |
+| Admin edit: attach a different row's certificate | "Certificate number mismatch" alert; form and image unchanged; no upload request | Passed 2026-11-19 at `d2aaa17` (no requests sent) |
 | Admin Export All | Zip contains every row in `certificates.csv` and a scannable QR per certificate number; no images or thumbnails | Pending |
 
 ## Backup And Restore
@@ -222,6 +222,18 @@ be committed.
   rollback is re-attaching the previous `r2_object_key`.
 - JPEG certificates are re-encoded once (quality 98, 4:4:4); PNG and WebP are
   written losslessly. GIF/animated images are rejected.
+
+## 2026-11-19 Release: Fix QR + Certificate OCR
+
+- Pushed `d2aaa17` to `main` (merge of `feat/fix-certificate-qr` and
+  `feat/certificate-ocr`); new build observed live at 23:12 local time via the
+  new `known-values` route changing from 405 to 401.
+- Pre-push: `npm run verify:local` passed (lint 0 errors, 124/124 tests,
+  schema validation, build, typecheck) and both features were exercised in
+  Chrome against a local database with all writes blocked.
+- Production: Fix QR preview succeeds (confirms `sharp` loads on Hostinger);
+  Fix QR Apply was not exercised. Hostinger build/runtime logs were not
+  inspected from this session.
 
 ## Certificate OCR Deployment Notes
 
