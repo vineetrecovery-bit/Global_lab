@@ -7,11 +7,12 @@ counts.
 
 ## Current Status
 
-As of 2026-10-10, Phase 1 of the migration-runner rollout is deployed. The
-runner is present but was not invoked by that release, so it made no database
-changes. The original migration counts remain historical evidence only; live row
-counts are expected to change during normal use. Production smoke results,
-restore ownership and retirement decisions still require authorized production
+As of 2026-11-19, the Fix QR and certificate OCR release (`d2aaa17`, docs
+follow-up `e045ddb`) is deployed; see "2026-11-19 Release" below. It made no
+schema or data changes. The 2026-10-10 Phase 1 migration-runner rollout remains
+the last release that touched migration tooling. The original migration counts
+remain historical evidence only; live row counts change during normal use.
+Restore ownership and retirement decisions still require authorized production
 access or an operator-provided record.
 
 ## Required Production Checkpoint
@@ -20,18 +21,19 @@ Fill this section during each production release.
 
 | Item | Value |
 |---|---|
-| Release date/time | 2026-10-10 (exact time not provided) |
+| Release date/time | 2026-11-19, new build observed live at 23:12 local time (previous: 2026-10-10) |
 | Deployment owner | Rohan Chawla |
 | Deployed URL | `https://globallabtesting.in/` |
-| Deployed Git revision | `fd78dea` (`Add deployment database migration runner`) |
+| Deployed Git revision | `e045ddb` (code at `d2aaa17`: Fix QR + certificate OCR); previous `fd78dea` |
 | Runtime platform/process model | Hostinger Next.js deployment; standalone server output detected; Node.js server restarted after publish |
-| Node/npm versions | Node.js 22.18.0 / npm 10.9.3 |
+| Node/npm versions | Node.js 22.18.0 / npm 10.9.3 as of 2026-10-10; not re-checked for the 2026-11-19 release |
 | Database host class/provider | Pending |
 | R2 bucket/account owner | Rohan Chawla |
 | Rollback owner | Pending |
 | Restore owner | Pending |
 
-Deployment metadata:
+Deployment metadata (recorded for the 2026-10-10 release; Hostinger build log
+for 2026-11-19 not yet inspected):
 
 - Build ID: `01a1241d-7795-73d1-9f4e-eedf6c9478aa`
 - Source: `github.com/vineetrecovery-bit/Global_lab`, branch `main`
@@ -151,7 +153,7 @@ read-only real-record check.
 | Admin create/edit/delete synthetic row | Row changes persist; stale edit conflict is visible | Pending |
 | Admin upload/save/cancel synthetic attachment | Valid upload saves; canceled upload does not alter previous record | Pending |
 | CSV import synthetic sample | Bounded import, row-level failures visible, no duplicate successes | Pending |
-| Admin Fix QR (synthetic row whose image has a wrong QR) | Preview shows current vs fixed QR; Apply attaches a new image under a new R2 key, the old object remains in R2, thumbnail refreshes, and the new QR scans to `https://globallabtesting.in/?batch=<number>` | Pending |
+| Admin Fix QR (synthetic row whose image has a wrong QR) | Preview shows current vs fixed QR; Apply attaches a new image under a new R2 key, the old object remains in R2, thumbnail refreshes, and the new QR scans to `https://globallabtesting.in/?batch=<number>` | Preview passed 2026-11-19 at `d2aaa17` on a real row (read-only; confirms `sharp` loads on Hostinger). Apply not yet exercised |
 | Admin edit: attach the row's own certificate | Number verified; confident values replace form values with "replaced" notes; nothing saved until Save | Passed 2026-11-19 at `d2aaa17` (read-only real row; upload stubbed, not saved) |
 | Admin edit: attach a different row's certificate | "Certificate number mismatch" alert; form and image unchanged; no upload request | Passed 2026-11-19 at `d2aaa17` (no requests sent) |
 | Admin Export All | Zip contains every row in `certificates.csv` and a scannable QR per certificate number; no images or thumbnails | Pending |
@@ -246,7 +248,28 @@ be committed.
   and no migration.
 - Editing a row: the certificate number read from the attached image must
   match the row exactly, otherwise the image is rejected before upload. Offline
-  evaluation on 240 production certificates: 240/240 wrong-row certificates
-  rejected, about 95% of correct certificates accepted (the rest need a clearer
-  image); see `Architecture.md` invariant 13.
+  evaluation on 240 production certificate images (Node.js, same extractor):
+  240/240 wrong-row certificates rejected; 213/240 correct certificates
+  accepted on the first OCR pass, and a 2x re-read recovered 14 of the other
+  27 (about 227/240, 95%). The remaining ~5% print the number beside a photo
+  or in small type and need a clearer image. The browser re-read uses canvas
+  scaling, so its recovery rate may differ slightly. See `Architecture.md`
+  invariant 13.
+- Field-fill accuracy varies by field: certificate number, colour,
+  transparency, lustre, origin and type are 95-100% precise when auto-filled.
+  Product name, weight, construction and botanical name often differ from
+  stored values because existing records use different wording than the
+  printed certificate. Certificate date is not printed on current certificates.
 - Rollback: revert the OCR commit; no data or storage cleanup is required.
+
+## Schema Drift Follow-Up
+
+Observed 2026-11-19: production `certificates` has 30 editable columns (for
+example `TYPE`, `WEIGHT`, `MUKHI`, `GEM_VARIETY`, `HARDNESS`, `BATCH_NO`),
+while `migrations/001_schema_baseline.sql` defines only `CERTIFICATE_NO`,
+`Certificate_photograph`, `PRODUCT_NAME` and `CATEGORY` besides internal
+columns. A database built only from tracked migrations would lack the columns
+used by the public allowlist and the OCR extractor. Capture the live columns
+in the next numbered migration (retry-safe `ADD COLUMN IF NOT EXISTS`-style
+DDL, reviewed against production and tested on an isolated database) before any
+other schema work. Not started; requires explicit approval.

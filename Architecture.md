@@ -108,6 +108,10 @@ or add broad ignores to make a check pass.
 
 ## Known Operational Follow-Ups
 
+- Tracked migrations lag production: 26 live `certificates` attribute columns
+  are missing from `001_schema_baseline.sql` (observed 2026-11-19). Add them as
+  the next numbered migration before other schema work; see
+  `docs/operational-handover.md` "Schema Drift Follow-Up".
 - Record each new deployed revision in `docs/operational-handover.md`.
 - Run production smoke checks after Hostinger deployment.
 - Keep R2 orphan cleanup disabled until retention policy is explicit.
