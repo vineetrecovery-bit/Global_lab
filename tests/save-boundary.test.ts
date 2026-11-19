@@ -213,6 +213,62 @@ describe('certificate save boundary', () => {
     expect(connection.commit).not.toHaveBeenCalled()
   })
 
+  it('fills an empty certificate date on create using the dominant stored style', async () => {
+    vi.useFakeTimers()
+    // 20:00 UTC on 19 Nov is already 20 Nov in India.
+    vi.setSystemTime(new Date('2026-11-19T20:00:00.000Z'))
+    try {
+      const inserts: Record<string, unknown>[] = []
+      const connection = mockConnection()
+      connection.execute = vi.fn(async (statement: unknown, params: unknown) => {
+        const sql = String(statement)
+        if (sql.startsWith('SELECT `CERTIFICATE_DATE` AS `value`')) {
+          return [[{ value: '02-08-2026' }, { value: '03-08-2026' }, { value: '2026-07-23' }]]
+        }
+        if (sql.startsWith('INSERT INTO `certificates`')) {
+          inserts.push(params as Record<string, unknown>)
+          return [{ insertId: 42 }]
+        }
+        return [[]]
+      })
+      connection.query = vi.fn().mockResolvedValue([[
+        { Field: 'CERTIFICATE_NO', Type: 'varchar(255)', Null: 'NO' },
+        { Field: 'CERTIFICATE_DATE', Type: 'varchar(255)', Null: 'YES' },
+      ]])
+      vi.mocked(getMysqlPool).mockReturnValue({ getConnection: vi.fn().mockResolvedValue(connection) } as never)
+
+      await createAdminCertificate({ CERTIFICATE_NO: 'TEST-42', CERTIFICATE_DATE: '  ' })
+      await createAdminCertificate({ CERTIFICATE_NO: 'TEST-43', CERTIFICATE_DATE: '01-01-2025' })
+
+      expect(inserts[0].CERTIFICATE_DATE).toBe('20-11-2026')
+      expect(inserts[1].CERTIFICATE_DATE).toBe('01-01-2025')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('never fills the certificate date on update', async () => {
+    const connection = mockConnection()
+    connection.query = vi.fn().mockResolvedValue([[
+      { Field: 'CERTIFICATE_NO', Type: 'varchar(255)', Null: 'NO' },
+      { Field: 'CERTIFICATE_DATE', Type: 'varchar(255)', Null: 'YES' },
+    ]])
+    connection.execute = vi.fn(async (statement: unknown) => {
+      const sql = String(statement)
+      if (sql.startsWith('UPDATE `certificates`')) return [{ affectedRows: 1 }]
+      if (sql.startsWith('SELECT `certificates`.*')) return [[{ id: 42, CERTIFICATE_NO: 'TEST-42' }]]
+      return [[]]
+    })
+    vi.mocked(getMysqlPool).mockReturnValue({ getConnection: vi.fn().mockResolvedValue(connection) } as never)
+
+    await updateAdminCertificate(42, { CERTIFICATE_NO: 'TEST-42', CERTIFICATE_DATE: '' })
+
+    const statements = vi.mocked(connection.execute).mock.calls.map(([sql]) => String(sql))
+    expect(statements.some((sql) => sql.includes('AS `value`'))).toBe(false)
+    const update = vi.mocked(connection.execute).mock.calls.find(([sql]) => String(sql).startsWith('UPDATE'))
+    expect((update?.[1] as Record<string, unknown>).CERTIFICATE_DATE).toBeNull()
+  })
+
   it('lists certificates with server pagination and search totals', async () => {
     const execute = vi.fn(async (statement: unknown, params: unknown) => {
       const sql = String(statement)

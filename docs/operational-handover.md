@@ -262,6 +262,16 @@ be committed.
   printed certificate. Certificate date is not printed on current certificates.
 - Rollback: revert the OCR commit; no data or storage cleanup is required.
 
+## Certificate Date Auto-Fill Deployment Notes
+
+- New rows (admin Add form and CSV import, both via `POST
+  /api/admin/certificates`) with an empty `CERTIFICATE_DATE` get today's
+  Asia/Kolkata date, formatted like the latest 50 stored dates. A supplied date
+  is kept. No schema change, no migration and no change to existing rows.
+- Smoke check: add a synthetic row without a date, confirm the date shows
+  today in the stored style, then delete the row.
+- Rollback: revert the commit; rows already created keep their stored date.
+
 ## Schema Drift Follow-Up
 
 Observed 2026-11-19: production `certificates` has 30 editable columns (for

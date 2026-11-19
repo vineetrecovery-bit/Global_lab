@@ -2,6 +2,10 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise'
 import { getMysqlPool } from '@/lib/mysql'
 import { verifyUploadAttachmentToken } from '@/lib/upload-attachment'
+import { certificateDateToday, dominantDateStyle, formatCertificateDate } from '@/lib/certificate-date'
+
+const CERTIFICATE_DATE_COLUMN = 'CERTIFICATE_DATE'
+const DATE_STYLE_SAMPLE_SIZE = 50
 
 const INTERNAL_COLUMNS = new Set([
   'id',
@@ -187,6 +191,9 @@ export async function createAdminCertificate(input: Record<string, unknown>) {
 
     validateCertificateNumber(data.CERTIFICATE_NO, true)
     await assertCertificateNumberAvailable(connection, data.CERTIFICATE_NO)
+    if (columns.has(CERTIFICATE_DATE_COLUMN) && !data[CERTIFICATE_DATE_COLUMN]) {
+      data[CERTIFICATE_DATE_COLUMN] = await defaultCertificateDate(connection)
+    }
     data.appwrite_document_id = `admin-${randomUUID()}`
 
     const keys = Object.keys(data)
@@ -307,6 +314,21 @@ async function getAdminCertificateById(
   )
 
   return rows[0] ? toAdminDocument(rows[0]) : null
+}
+
+// New rows without a date get today's date, formatted like recent rows so the
+// stored text stays consistent. Existing rows and updates are never touched.
+async function defaultCertificateDate(connection: Pick<PoolConnection, 'execute'>, now: Date = new Date()) {
+  const [rows] = await connection.execute<(RowDataPacket & { value: unknown })[]>(
+    [
+      `SELECT ${qid(CERTIFICATE_DATE_COLUMN)} AS \`value\` FROM \`certificates\``,
+      `WHERE ${qid(CERTIFICATE_DATE_COLUMN)} IS NOT NULL AND ${qid(CERTIFICATE_DATE_COLUMN)} <> ''`,
+      'ORDER BY `id` DESC',
+      `LIMIT ${DATE_STYLE_SAMPLE_SIZE}`,
+    ].join(' ')
+  )
+  const known = rows.map((row) => String(row.value))
+  return formatCertificateDate(certificateDateToday(now), dominantDateStyle(known))
 }
 
 async function editableColumnNames(connection?: Pick<PoolConnection, 'query'>) {

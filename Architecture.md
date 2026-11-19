@@ -65,6 +65,10 @@ Every change must preserve or move the code toward these rules:
     result under a new key through the revision-checked certificate transaction,
     and returns nothing unless the repaired image decodes to the expected
     verification URL. Identical input bytes must produce identical output bytes.
+16. Creating a certificate with an empty `CERTIFICATE_DATE` stores today's
+    Asia/Kolkata date on the server, in the separator/order style most common
+    among the latest 50 stored dates (`lib/certificate-date.ts`). A supplied
+    date is kept as given. Updates and existing rows are never back-filled.
 
 ## Boundary Rules
 

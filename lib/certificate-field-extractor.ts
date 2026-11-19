@@ -4,6 +4,8 @@
 // live column names, and values are validated against what existing records
 // already contain (vocabulary, value shapes, casing and date style).
 
+import { dominantDateStyle, formatCertificateDate } from '@/lib/certificate-date'
+
 export type FieldKnowledge = {
   /** Every existing non-empty value per column, duplicates included. */
   values: Record<string, string[]>
@@ -580,12 +582,7 @@ function findCertificateDate(text: string, knownDates: string[]): ExtractedField
   const { year, month, day } = parsed
   if (month < 1 || month > 12 || day < 1 || day > 31 || year < 1990 || year > 2100) return null
 
-  const style = dominantDateStyle(knownDates)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const value =
-    style.order === 'ymd'
-      ? [year, pad(month), pad(day)].join(style.separator)
-      : [pad(day), pad(month), year].join(style.separator)
+  const value = formatCertificateDate({ year, month, day }, dominantDateStyle(knownDates))
   return { value, confidence: 0.85, source: 'pattern', evidence: 'Date found in certificate text' }
 }
 
@@ -601,19 +598,6 @@ function parseFirstDate(text: string): { year: number; month: number; day: numbe
     if (month > 0) return { year: Number(named[3]), month, day: Number(named[1]) }
   }
   return null
-}
-
-function dominantDateStyle(known: string[]): { order: 'ymd' | 'dmy'; separator: string } {
-  const tally = new Map<string, number>()
-  for (const value of known) {
-    const m = value.trim().match(/^(\d{1,4})([-/.])(\d{1,2})[-/.](\d{1,4})$/)
-    if (!m) continue
-    const key = `${m[1].length === 4 ? 'ymd' : 'dmy'}${m[2]}`
-    tally.set(key, (tally.get(key) ?? 0) + 1)
-  }
-  const top = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
-  if (!top) return { order: 'dmy', separator: '-' }
-  return { order: top.startsWith('ymd') ? 'ymd' : 'dmy', separator: top.slice(3) }
 }
 
 // ---------- text helpers ----------
