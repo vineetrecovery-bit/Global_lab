@@ -24,7 +24,7 @@ Fill this section during each production release.
 | Release date/time | 2026-11-19, new build observed live at 23:12 local time (previous: 2026-10-10) |
 | Deployment owner | Rohan Chawla |
 | Deployed URL | `https://globallabtesting.in/` |
-| Deployed Git revision | `e045ddb` (code at `d2aaa17`: Fix QR + certificate OCR); previous `fd78dea` |
+| Deployed Git revision | `3c2497f` (bulk row actions); previous `e045ddb` (code at `d2aaa17`: Fix QR + certificate OCR) |
 | Runtime platform/process model | Hostinger Next.js deployment; standalone server output detected; Node.js server restarted after publish |
 | Node/npm versions | Node.js 22.18.0 / npm 10.9.3 as of 2026-10-10; not re-checked for the 2026-11-19 release |
 | Database host class/provider | Pending |
@@ -254,6 +254,12 @@ be committed.
   bad repair is undone by re-attaching the previous `r2_object_key`.
 - Download Certificates holds the selected originals in browser memory while
   zipping; selection is limited to one page (25 rows).
+- 2026-11-20: rebased on `main` (already current), `npm run verify:local` passed
+  (lint 0 errors, 133/133 tests, schema validation, build, typecheck), merged as
+  `3c2497f` and pushed. Hostinger rebuilt from `main`; the live homepage bundle
+  contains the new bulk toolbar and the homepage returns 200. Admin bulk smoke
+  checks were not run from this session; Hostinger build/runtime logs were not
+  inspected.
 
 ## Certificate OCR Deployment Notes
 
