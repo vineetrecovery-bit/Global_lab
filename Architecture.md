@@ -46,7 +46,17 @@ Every change must preserve or move the code toward these rules:
 11. Schema changes are ordered migrations tested on an isolated database.
 12. Secrets, hashes, private records and file contents never enter source
     control, logs, fixtures or documentation.
-13. Deployments apply immutable, checksummed migrations before starting a new
+13. Certificate OCR runs in the browser only and never sends an image to a
+    third-party or AI service. When a certificate is attached to an existing
+    row, the certificate number read from the image must match the row's
+    number exactly (no fuzzy digit matching); a mismatch or unreadable number
+    rejects the image before upload with an explicit message. On a match,
+    confident values replace the row's values in the form; in Add mode they
+    fill only empty fields. Low-confidence reads are suggestions, and nothing
+    is saved until the admin presses save. The extractor stays pure and
+    design-independent: labels come from live column names, never from a
+    certificate template.
+14. Deployments apply immutable, checksummed migrations before starting a new
     application build. Concurrent migration runners are serialized, and an
     application release stops if migration history is missing or inconsistent.
 14. Certificate QR repair is deterministic and verified. It uses only
@@ -62,6 +72,7 @@ Every change must preserve or move the code toward these rules:
 |---|---|---|
 | `app/api` | HTTP decoding, auth guard, validation, use-case call, response mapping | UI state or provider secrets in responses |
 | UI components | Presentation, form state, loading/error states | SQL, secrets, provider signing or trusted validation |
+| OCR modules | Browser-local text recognition and pure field extraction | Network writes, SQL or form state |
 | CSV modules | Pure parsing, header mapping and preflight validation | React state or network writes |
 | Certificate server module | Invariants, revision checks and transaction ownership | Browser assumptions |
 | Storage/image modules | R2 protocol, file validation and bounded processing | Certificate form state |

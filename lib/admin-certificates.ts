@@ -141,6 +141,35 @@ export async function getAdminAttributes(): Promise<AdminAttribute[]> {
     }))
 }
 
+const KNOWN_VALUES_ROW_LIMIT = 5000
+const KNOWN_VALUES_MAX_LENGTH = 200
+const KNOWN_VALUES_EXCLUDED = new Set(['Certificate_photograph'])
+
+// Existing values per column. The OCR field extractor learns vocabulary, value
+// formats and casing from these, so extraction adapts to the live schema.
+export async function getAdminKnownValues(): Promise<Record<string, string[]>> {
+  const columns = (await getCertificateColumns())
+    .map((column) => column.name)
+    .filter((name) => !INTERNAL_COLUMNS.has(name) && !KNOWN_VALUES_EXCLUDED.has(name))
+  if (columns.length === 0) return {}
+
+  const select = columns.map((name) => `\`${name.replace(/`/g, '``')}\``).join(', ')
+  const [rows] = await getMysqlPool().query<RowDataPacket[]>(
+    `SELECT ${select} FROM \`certificates\` LIMIT ${KNOWN_VALUES_ROW_LIMIT}`
+  )
+
+  const values: Record<string, string[]> = Object.fromEntries(columns.map((name) => [name, []]))
+  for (const row of rows) {
+    for (const name of columns) {
+      const value = row[name]
+      if (value === null || value === undefined) continue
+      const text = String(value).trim()
+      if (text && text.length <= KNOWN_VALUES_MAX_LENGTH) values[name].push(text)
+    }
+  }
+  return values
+}
+
 export async function createAdminCertificate(input: Record<string, unknown>) {
   assertPlainInput(input)
   const connection = await getMysqlPool().getConnection()
