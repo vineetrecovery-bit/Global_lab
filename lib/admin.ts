@@ -97,6 +97,12 @@ export async function getAttributes() {
   return attributes
 }
 
+// ---- Known values (for certificate OCR field extraction) ----
+export async function getKnownValues() {
+  const { values } = await api<{ values: Record<string, string[]> }>('/api/admin/certificates/known-values')
+  return values
+}
+
 // ---- Storage ----
 export async function uploadImage(file: File, certificateNo?: string): Promise<UploadedImage> {
   const formData = new FormData()

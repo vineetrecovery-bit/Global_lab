@@ -15,6 +15,13 @@ import {
 import { CertificateQrAction, CertificateQrCell } from '@/components/certificate-qr-dialog'
 import { csvRowToDocument, getCsvMapping as mapCsvHeaders } from '@/lib/csv-import'
 import { parseCSV, type ParsedCSV } from '@/lib/csv'
+import { recognizeCertificateText } from '@/lib/certificate-ocr'
+import {
+  AUTOFILL_CONFIDENCE,
+  extractCertificateFields,
+  verifyCertificateNumber,
+  type ExtractedField,
+} from '@/lib/certificate-field-extractor'
 
 type Mode = 'closed' | 'login' | 'panel'
 
@@ -839,6 +846,23 @@ function RowFormModal({
   const [removeImage, setRemoveImage] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const previewObjectUrlRef = useRef<string | null>(null)
+  const formDataRef = useRef(formData)
+  useEffect(() => {
+    formDataRef.current = formData
+  }, [formData])
+  const [extraction, setExtraction] = useState<
+    | { status: 'idle' }
+    | { status: 'running' }
+    | { status: 'failed' }
+    | { status: 'rejected'; message: string }
+    | {
+        status: 'done'
+        filled: Record<string, ExtractedField>
+        suggestions: Record<string, ExtractedField>
+        /** Previous values that the certificate replaced, keyed by column. */
+        replaced: Record<string, string>
+      }
+  >({ status: 'idle' })
 
   const revokePreviewObjectUrl = useCallback(() => {
     if (previewObjectUrlRef.current) {
@@ -851,6 +875,133 @@ function RowFormModal({
 
   const handleChange = (key: string, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }))
+    setExtraction((prev) => {
+      if (prev.status !== 'done' || !(key in prev.filled)) return prev
+      const filled = Object.fromEntries(Object.entries(prev.filled).filter(([name]) => name !== key))
+      return { ...prev, filled }
+    })
+  }
+
+  type CertificateRead = { fields: Record<string, ExtractedField> }
+  type CertificateReadResult = ({ ok: true } & CertificateRead) | { ok: false; message: string }
+
+  // Reads the certificate locally (no AI service). When the form edits an existing
+  // row, the certificate number printed on the image must match the row's number.
+  const readCertificate = async (file: File): Promise<CertificateReadResult> => {
+    const [textResult, knownResult] = await Promise.allSettled([
+      recognizeCertificateText(file),
+      admin.getKnownValues(),
+    ])
+    if (textResult.status === 'rejected') {
+      return {
+        ok: false,
+        message: editData
+          ? 'This certificate could not be read, so its number could not be checked against this row. The row was not changed and the image was not attached. Try a clearer image.'
+          : 'This certificate could not be read automatically. Fill the fields manually.',
+      }
+    }
+    if (knownResult.status === 'rejected') {
+      return {
+        ok: false,
+        message: 'Existing records could not be loaded to check this certificate. Nothing was changed. Please try again.',
+      }
+    }
+
+    let text = textResult.value
+    const known = { ...knownResult.value }
+
+    if (editData) {
+      const expected = String(editData.CERTIFICATE_NO ?? '').trim()
+      let check = verifyCertificateNumber(text, expected, known.CERTIFICATE_NO ?? [])
+      if (check.status !== 'match') {
+        // Second pass on an enlarged copy: small print is often missed at 1x.
+        const retry = await recognizeCertificateText(file, { scale: 2 }).catch(() => null)
+        if (retry) {
+          const retryCheck = verifyCertificateNumber(retry, expected, known.CERTIFICATE_NO ?? [])
+          if (retryCheck.status === 'match' || check.status === 'unreadable') {
+            check = retryCheck
+            text = `${text}\n${retry}`
+          }
+        }
+      }
+      if (check.status === 'mismatch') {
+        return {
+          ok: false,
+          message: `Certificate number mismatch: this image shows "${check.found}" but this row is "${expected}". The row was not changed and the image was not attached. Make sure you selected the certificate for this row.`,
+        }
+      }
+      if (check.status === 'unreadable') {
+        return {
+          ok: false,
+          message: `No certificate number could be read from this image, so it could not be matched to "${expected}". The row was not changed and the image was not attached. Try a clearer image.`,
+        }
+      }
+      // The row's own number is not a duplicate of itself.
+      known.CERTIFICATE_NO = (known.CERTIFICATE_NO ?? []).filter((value) => value !== expected)
+    }
+
+    const columnKeys = columns.map((col) => col.key)
+    const { fields } = extractCertificateFields(text, columnKeys, { values: known })
+    if (!editData && !fields.CERTIFICATE_NO && columnKeys.includes('CERTIFICATE_NO')) {
+      const retry = await recognizeCertificateText(file, { scale: 2 }).catch(() => null)
+      const number = retry ? extractCertificateFields(retry, ['CERTIFICATE_NO'], { values: known }).fields.CERTIFICATE_NO : undefined
+      if (number) fields.CERTIFICATE_NO = number
+    }
+    return { ok: true, fields }
+  }
+
+  // Edit mode: confident certificate values replace the row's current values.
+  // Add mode: they only fill fields that are still empty.
+  // Low-confidence reads are always suggestions, never applied.
+  const applyExtraction = (fields: Record<string, ExtractedField>, replaceExisting: boolean) => {
+    const current = formDataRef.current
+    const filled: Record<string, ExtractedField> = {}
+    const suggestions: Record<string, ExtractedField> = {}
+    const replaced: Record<string, string> = {}
+
+    for (const [key, field] of Object.entries(fields)) {
+      if (key === 'CERTIFICATE_NO' && replaceExisting) continue
+      const existing = (current[key] ?? '').trim()
+      if (existing === field.value.trim()) continue
+      if (field.confidence >= AUTOFILL_CONFIDENCE) {
+        if (existing && !replaceExisting) continue
+        filled[key] = field
+        if (existing) replaced[key] = existing
+      } else if (field.confidence >= 0.3) {
+        suggestions[key] = field
+      }
+    }
+
+    setFormData((prev) => {
+      const next = { ...prev }
+      for (const [key, field] of Object.entries(filled)) {
+        if (replaceExisting || !(next[key] ?? '').trim()) next[key] = field.value
+      }
+      return next
+    })
+    setExtraction({ status: 'done', filled, suggestions, replaced })
+  }
+
+  const extractFromImage = async (file: File) => {
+    setExtraction({ status: 'running' })
+    const result = await readCertificate(file)
+    if (!result.ok) setExtraction({ status: 'failed' })
+    else applyExtraction(result.fields, false)
+  }
+
+  const acceptSuggestion = (key: string, field: ExtractedField) => {
+    setFormData((prev) => ({ ...prev, [key]: field.value }))
+    setExtraction((prev) => {
+      if (prev.status !== 'done') return prev
+      const suggestions = Object.fromEntries(Object.entries(prev.suggestions).filter(([name]) => name !== key))
+      const previous = (formDataRef.current[key] ?? '').trim()
+      return {
+        ...prev,
+        suggestions,
+        filled: { ...prev.filled, [key]: field },
+        replaced: previous ? { ...prev.replaced, [key]: previous } : prev.replaced,
+      }
+    })
   }
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -858,6 +1009,18 @@ function RowFormModal({
     if (!file) return
     setUploading(true)
     try {
+      // Editing an existing row: verify the certificate belongs to it before anything is uploaded.
+      let verified: CertificateRead | null = null
+      if (editData) {
+        setExtraction({ status: 'running' })
+        const result = await readCertificate(file)
+        if (!result.ok) {
+          setExtraction({ status: 'rejected', message: result.message })
+          return
+        }
+        verified = result
+      }
+
       const [upload, thumbnailDataUrl] = await Promise.all([
         admin.uploadImage(file, formData.CERTIFICATE_NO),
         createThumbnailDataUrl(file),
@@ -870,6 +1033,8 @@ function RowFormModal({
       setRemoveImage(false)
       setFormData((prev) => ({ ...prev, Certificate_photograph: uploaded.originalName }))
       setImagePreview(previewUrl)
+      if (verified) applyExtraction(verified.fields, true)
+      else void extractFromImage(file)
     } catch {
       alert('Image upload failed')
     } finally {
@@ -917,6 +1082,63 @@ function RowFormModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {extraction.status === 'running' && (
+            <p className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Reading certificate…
+            </p>
+          )}
+          {extraction.status === 'rejected' && (
+            <p
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-destructive/60 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {extraction.message}
+            </p>
+          )}
+          {extraction.status === 'failed' && (
+            <p className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+              <AlertCircle className="h-4 w-4" /> Could not read this certificate automatically. Fill the fields manually.
+            </p>
+          )}
+          {extraction.status === 'done' && (
+            <div className="space-y-2 rounded-md border border-border bg-background px-3 py-3 text-xs">
+              <p className="flex items-center gap-2 text-muted-foreground">
+                <Check className="h-4 w-4 text-gold" />
+                {Object.keys(extraction.filled).length > 0
+                  ? `Updated ${Object.keys(extraction.filled).length} field(s) from the certificate${
+                      Object.keys(extraction.replaced).length > 0
+                        ? `, replacing ${Object.keys(extraction.replaced).length} existing value(s)`
+                        : ''
+                    }. Check the highlighted fields before saving.`
+                  : 'No fields needed updating from the certificate.'}
+              </p>
+              {Object.entries(extraction.suggestions).length > 0 && (
+                <div>
+                  <p className="mb-1 uppercase tracking-wide text-muted-foreground">Suggestions (not applied)</p>
+                  <ul className="space-y-1">
+                    {Object.entries(extraction.suggestions).map(([key, field]) => (
+                      <li key={key} className="flex items-start justify-between gap-2">
+                        <span className="min-w-0 text-muted-foreground">
+                          <span className="font-medium text-foreground">{key}:</span> {field.value}
+                          {field.source === 'pattern' && field.evidence ? (
+                            <span className="block text-[10px] text-destructive">{field.evidence}</span>
+                          ) : null}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => acceptSuggestion(key, field)}
+                          className="shrink-0 rounded border border-border px-2 py-0.5 text-[10px] hover:border-gold/50 hover:text-gold"
+                        >
+                          Use
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           {columns.map((col) => (
             <div key={col.key}>
               <label className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -965,8 +1187,16 @@ function RowFormModal({
                   onChange={(e) => handleChange(col.key, e.target.value)}
                   required={col.required}
                   placeholder={`Enter ${col.key}`}
-                  className="mt-2 w-full rounded-md border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold"
+                  className={`mt-2 w-full rounded-md border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold ${
+                    extraction.status === 'done' && col.key in extraction.filled ? 'border-gold' : 'border-border'
+                  }`}
                 />
+              )}
+              {extraction.status === 'done' && col.key in extraction.filled && col.key !== 'Certificate_photograph' && (
+                <p className="mt-1 text-[10px] text-gold">
+                  Read from certificate — please verify
+                  {col.key in extraction.replaced ? ` (replaced “${extraction.replaced[col.key]}”)` : ''}
+                </p>
               )}
             </div>
           ))}
