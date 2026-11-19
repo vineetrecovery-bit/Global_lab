@@ -125,7 +125,12 @@ may need to be redeployed once before this view starts collecting output.
 | `auth.login` | `success`, `rejected`, `throttled`, or `service_error`; request ID and duration | Email, password, session token, IP address |
 
 Admin certificate listing, creation, editing, deletion, CSV import, Export All,
-upload and Fix QR actions do not emit activity logs. Export All runs in the browser:
+upload, Fix QR and bulk (Bulk Fix QR, Download Certificates) actions do not emit
+activity logs. Bulk actions add no server route: selecting rows with the
+per-row checkboxes swaps the toolbar for **Bulk Fix QR** (one
+`POST /api/admin/certificates/[id]/fix-qr` apply call per selected row) and
+**Download Certificates (zip)** (one `GET /api/certificates/[no]/image` per
+selected row, zipped in the browser). Export All runs in the browser:
 it pages through the admin list API and builds the zip (CSV plus one QR PNG per
 certificate number) client-side, so no new server route or response-size limit
 is involved. Fix QR runs server-side (`POST /api/admin/certificates/[id]/fix-qr`)
@@ -156,6 +161,9 @@ read-only real-record check.
 | Admin Fix QR (synthetic row whose image has a wrong QR) | Preview shows current vs fixed QR; Apply attaches a new image under a new R2 key, the old object remains in R2, thumbnail refreshes, and the new QR scans to `https://globallabtesting.in/?batch=<number>` | Preview passed 2026-11-19 at `d2aaa17` on a real row (read-only; confirms `sharp` loads on Hostinger). Apply not yet exercised |
 | Admin edit: attach the row's own certificate | Number verified; confident values replace form values with "replaced" notes; nothing saved until Save | Passed 2026-11-19 at `d2aaa17` (read-only real row; upload stubbed, not saved) |
 | Admin edit: attach a different row's certificate | "Certificate number mismatch" alert; form and image unchanged; no upload request | Passed 2026-11-19 at `d2aaa17` (no requests sent) |
+| Admin row selection (synthetic rows) | Row checkboxes and header select-all/indeterminate work; selecting any row replaces the toolbar with Bulk Fix QR and Download Certificates; clearing selection or changing page/search restores the usual buttons | Pending |
+| Admin Bulk Fix QR (synthetic rows: one wrong QR, one correct, one without image) | Summary shows 1 fixed, 1 already correct, 1 skipped; only the wrong row gets a new R2 key; table refreshes | Pending |
+| Admin Download Certificates (synthetic rows with and without image) | Zip contains one original image per selected row that has an image; rows without an image are ignored; selecting only rows without images shows "No photo selected" and downloads nothing | Pending |
 | Admin Export All | Zip contains every row in `certificates.csv` and a scannable QR per certificate number; no images or thumbnails | Pending |
 
 ## Backup And Restore
@@ -236,6 +244,16 @@ be committed.
 - Production: Fix QR preview succeeds (confirms `sharp` loads on Hostinger);
   Fix QR Apply was not exercised. Hostinger build/runtime logs were not
   inspected from this session.
+
+## Bulk Row Actions Deployment Notes
+
+- Branch `feat/bulk-row-selection`. Browser-only change (`components/admin-panel.tsx`,
+  `lib/admin-bulk.ts`); no new dependency (`fflate` already ships for Export All),
+  no new server route, no schema change and no migration.
+- Bulk Fix QR inherits the Fix QR rollback: superseded originals stay in R2, so a
+  bad repair is undone by re-attaching the previous `r2_object_key`.
+- Download Certificates holds the selected originals in browser memory while
+  zipping; selection is limited to one page (25 rows).
 
 ## Certificate OCR Deployment Notes
 
