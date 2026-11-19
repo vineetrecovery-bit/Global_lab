@@ -59,7 +59,7 @@ Every change must preserve or move the code toward these rules:
 14. Deployments apply immutable, checksummed migrations before starting a new
     application build. Concurrent migration runners are serialized, and an
     application release stops if migration history is missing or inconsistent.
-14. Certificate QR repair is deterministic and verified. It uses only
+15. Certificate QR repair is deterministic and verified. It uses only
     finder-pattern geometry and integer pixel math (no AI/ML, OCR or randomness),
     changes only the QR square, never overwrites the original object, stores the
     result under a new key through the revision-checked certificate transaction,
