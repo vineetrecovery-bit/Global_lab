@@ -10,6 +10,8 @@ Current live docs:
   including their current resolution status.
 - [`r2-task-order.md`](r2-task-order.md): dependency-aware implementation order
   and completion outcomes for the R2 work.
+- [`superpowers/plans/2026-11-19-fix-certificate-qr.md`](superpowers/plans/2026-11-19-fix-certificate-qr.md):
+  design and decisions for the admin **Fix QR** feature.
 
 Historical audit and migration planning files were removed after the migration
 and architecture-audit work completed. Ignored local backups remain outside Git.

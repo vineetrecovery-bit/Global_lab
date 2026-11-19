@@ -1,6 +1,6 @@
 # Global Lab Architecture Guide
 
-Last reviewed: **2026-10-03**
+Last reviewed: **2026-11-19**
 
 This is the durable engineering contract for Global Lab. Keep it short and
 current. Operational deployment evidence lives in
@@ -49,6 +49,12 @@ Every change must preserve or move the code toward these rules:
 13. Deployments apply immutable, checksummed migrations before starting a new
     application build. Concurrent migration runners are serialized, and an
     application release stops if migration history is missing or inconsistent.
+14. Certificate QR repair is deterministic and verified. It uses only
+    finder-pattern geometry and integer pixel math (no AI/ML, OCR or randomness),
+    changes only the QR square, never overwrites the original object, stores the
+    result under a new key through the revision-checked certificate transaction,
+    and returns nothing unless the repaired image decodes to the expected
+    verification URL. Identical input bytes must produce identical output bytes.
 
 ## Boundary Rules
 
@@ -59,6 +65,7 @@ Every change must preserve or move the code toward these rules:
 | CSV modules | Pure parsing, header mapping and preflight validation | React state or network writes |
 | Certificate server module | Invariants, revision checks and transaction ownership | Browser assumptions |
 | Storage/image modules | R2 protocol, file validation and bounded processing | Certificate form state |
+| Certificate QR repair (`lib/qr-locate.ts`, `lib/certificate-qr-fix.ts`, `lib/admin-certificate-qr-fix.ts`) | Deterministic QR location, pixel-exact repaint, decode verification, and the server use-case that stores the result as a new image | React state, SQL outside `updateAdminCertificate`, any ML/OCR/heuristic-with-randomness step |
 | Auth/config | Session policy and validated configuration | Client-bundled secrets |
 | Migrations | Explicit schema evolution and recovery procedure | Runtime browser imports |
 

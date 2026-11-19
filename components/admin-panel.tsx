@@ -13,6 +13,7 @@ import {
   type ExportProgress,
 } from '@/lib/admin-export'
 import { CertificateQrAction, CertificateQrCell } from '@/components/certificate-qr-dialog'
+import { CertificateQrFixAction } from '@/components/certificate-qr-fix-dialog'
 import { csvRowToDocument, getCsvMapping as mapCsvHeaders } from '@/lib/csv-import'
 import { parseCSV, type ParsedCSV } from '@/lib/csv'
 
@@ -577,6 +578,7 @@ function RowsTab() {
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                       <CertificateQrAction certificateNo={doc.CERTIFICATE_NO} />
+                      <CertificateQrFixAction doc={doc} onFixed={() => fetchData(page, search)} />
                     </div>
                   </td>
                   {showQrs && (

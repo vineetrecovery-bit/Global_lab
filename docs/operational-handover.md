@@ -122,11 +122,12 @@ may need to be redeployed once before this view starts collecting output.
 | `certificate.verify` | `verified`, `not_found`, `invalid_request`, `duplicate`, or `service_error`; request ID, certificate number when supplied, duration, verified public-field count/names, and image presence | Certificate field values, image/storage keys, file contents, IP address |
 | `auth.login` | `success`, `rejected`, `throttled`, or `service_error`; request ID and duration | Email, password, session token, IP address |
 
-Admin certificate listing, creation, editing, deletion, CSV import, Export All
-and upload actions do not emit activity logs. Export All runs in the browser:
+Admin certificate listing, creation, editing, deletion, CSV import, Export All,
+upload and Fix QR actions do not emit activity logs. Export All runs in the browser:
 it pages through the admin list API and builds the zip (CSV plus one QR PNG per
 certificate number) client-side, so no new server route or response-size limit
-is involved. Existing provider-error messages in those
+is involved. Fix QR runs server-side (`POST /api/admin/certificates/[id]/fix-qr`)
+and logs only an error name and request ID on unexpected failures. Existing provider-error messages in those
 routes remain error diagnostics rather than admin audit events.
 
 To verify a deployment, open **Websites → Dashboard** for the domain, select
@@ -150,6 +151,7 @@ read-only real-record check.
 | Admin create/edit/delete synthetic row | Row changes persist; stale edit conflict is visible | Pending |
 | Admin upload/save/cancel synthetic attachment | Valid upload saves; canceled upload does not alter previous record | Pending |
 | CSV import synthetic sample | Bounded import, row-level failures visible, no duplicate successes | Pending |
+| Admin Fix QR (synthetic row whose image has a wrong QR) | Preview shows current vs fixed QR; Apply attaches a new image under a new R2 key, the old object remains in R2, thumbnail refreshes, and the new QR scans to `https://globallabtesting.in/?batch=<number>` | Pending |
 | Admin Export All | Zip contains every row in `certificates.csv` and a scannable QR per certificate number; no images or thumbnails | Pending |
 
 ## Backup And Restore
@@ -205,3 +207,16 @@ be committed.
 | Bucket access | Private |
 | Retention/lifecycle policy | Manual/operator-owned unless later configured in Cloudflare |
 | Orphan cleanup policy | Pending; do not delete unattached objects until retention policy is explicit |
+
+## Fix QR Deployment Notes
+
+- Adds the exact-pinned runtime dependencies `sharp` (native image binaries) and
+  `jsqr`. Confirm `npm ci` on Hostinger installs the platform `sharp` binary and
+  that the first Fix QR preview succeeds after deploy; if it fails with a
+  module-load error, the host lacks the binary and the feature (not the rest of
+  the app) is unavailable.
+- No schema change and no migration. Fixed images use new object keys; the
+  superseded original stays in R2 (R2 orphan cleanup remains disabled), so a
+  rollback is re-attaching the previous `r2_object_key`.
+- JPEG certificates are re-encoded once (quality 98, 4:4:4); PNG and WebP are
+  written losslessly. GIF/animated images are rejected.

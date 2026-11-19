@@ -113,3 +113,39 @@ export function getImageUrl(document: { $imageUrl?: string; Certificate_photogra
   if (typeof document === 'string') return document.startsWith('/api/') ? document : ''
   return document.$imageUrl || ''
 }
+
+// ---- Certificate QR repair ----
+export type QrFixRegion = { x: number; y: number; size: number }
+export type QrFixResponse =
+  | { status: 'already_correct'; expectedUrl: string }
+  | {
+      status: 'preview' | 'applied'
+      expectedUrl: string
+      decodedBefore: string | null
+      lossless: boolean
+      region: QrFixRegion
+      beforePreview: string
+      afterPreview: string
+    }
+
+export class QrFixRequestError extends Error {
+  constructor(message: string, readonly code?: string) {
+    super(message)
+    this.name = 'QrFixRequestError'
+  }
+}
+
+export async function fixCertificateQr(
+  docId: string,
+  options: { mode: 'preview' | 'apply'; region?: QrFixRegion; expectedRevision?: string }
+): Promise<QrFixResponse> {
+  const response = await fetch(`/api/admin/certificates/${encodeURIComponent(docId)}/fix-qr`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(options),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new QrFixRequestError(data?.error || `Request failed with ${response.status}`, data?.code)
+  return data
+}
