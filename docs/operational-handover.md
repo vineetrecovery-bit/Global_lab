@@ -152,6 +152,8 @@ read-only real-record check.
 | Admin upload/save/cancel synthetic attachment | Valid upload saves; canceled upload does not alter previous record | Pending |
 | CSV import synthetic sample | Bounded import, row-level failures visible, no duplicate successes | Pending |
 | Admin Fix QR (synthetic row whose image has a wrong QR) | Preview shows current vs fixed QR; Apply attaches a new image under a new R2 key, the old object remains in R2, thumbnail refreshes, and the new QR scans to `https://globallabtesting.in/?batch=<number>` | Pending |
+| Admin edit: attach the row's own certificate | Number verified; confident values replace form values with "replaced" notes; nothing saved until Save | Pending |
+| Admin edit: attach a different row's certificate | "Certificate number mismatch" alert; form and image unchanged; no upload request | Pending |
 | Admin Export All | Zip contains every row in `certificates.csv` and a scannable QR per certificate number; no images or thumbnails | Pending |
 
 ## Backup And Restore
@@ -220,3 +222,19 @@ be committed.
   rollback is re-attaching the previous `r2_object_key`.
 - JPEG certificates are re-encoded once (quality 98, 4:4:4); PNG and WebP are
   written losslessly. GIF/animated images are rejected.
+
+## Certificate OCR Deployment Notes
+
+- Adds `tesseract.js` (browser-only). OCR runs in the admin's browser; on first
+  use the browser downloads the OCR worker, WASM core and English language data
+  from the jsDelivr CDN, so admins need outbound access to `cdn.jsdelivr.net`.
+  Certificate images are never sent to a third party.
+- Adds the admin-only `GET /api/admin/certificates/known-values` endpoint
+  (existing values per editable column, capped at 5,000 rows). No schema change
+  and no migration.
+- Editing a row: the certificate number read from the attached image must
+  match the row exactly, otherwise the image is rejected before upload. Offline
+  evaluation on 240 production certificates: 240/240 wrong-row certificates
+  rejected, about 95% of correct certificates accepted (the rest need a clearer
+  image); see `Architecture.md` invariant 13.
+- Rollback: revert the OCR commit; no data or storage cleanup is required.
