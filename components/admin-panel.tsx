@@ -3,9 +3,17 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   X, LogOut, Plus, Trash2, Pencil, Save, Upload, Download,
-  Shield, Loader2, AlertCircle, Search, FileArchive, RefreshCw, Check, QrCode
+  Shield, Loader2, AlertCircle, Search, FileArchive, RefreshCw, Check, QrCode, ScanLine
 } from 'lucide-react'
 import * as admin from '@/lib/admin'
+import {
+  buildCertificateImagesZip,
+  bulkFixCertificateQrs,
+  certificatesZipFileName,
+  type BulkProgress,
+  type BulkQrFixSummary,
+  type CertificateZipResult,
+} from '@/lib/admin-bulk'
 import {
   buildExportZip,
   exportFileName,
@@ -240,6 +248,15 @@ function RowsTab() {
   const [refreshStatus, setRefreshStatus] = useState<null | 'updated' | 'failed'>(null)
   const refreshStatusTimerRef = useRef<number | null>(null)
 
+  // Row selection and bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [bulk, setBulk] = useState<
+    | null
+    | { kind: 'fix-qr'; running: boolean; progress: BulkProgress | null; result?: BulkQrFixSummary; error?: string }
+    | { kind: 'download'; running: boolean; progress: BulkProgress | null; result?: CertificateZipResult; error?: string }
+  >(null)
+  const bulkAbortRef = useRef<AbortController | null>(null)
+
   // Resolves true when the page loaded, false when the request failed.
   const fetchData = useCallback(async (nextPage: number, nextSearch: string): Promise<boolean> => {
     if (!hasLoadedRef.current) {
@@ -251,6 +268,12 @@ function RowsTab() {
         admin.getAttributes(),
       ])
       setDocuments(list.documents)
+      // Keep only selections still visible on the loaded page (a page or search change clears them).
+      const visible = new Set(list.documents.map((doc) => String(doc.$id)))
+      setSelectedIds((prev) => {
+        const next = new Set([...prev].filter((id) => visible.has(id)))
+        return next.size === prev.size ? prev : next
+      })
       setPage(list.page)
       setTotalRows(list.total)
       setColumns(
@@ -435,6 +458,87 @@ function RowsTab() {
     return 'Building zip...'
   }
 
+  // Selection + bulk handlers
+  const selectedDocs = documents.filter((doc) => selectedIds.has(String(doc.$id)))
+  const allSelected = documents.length > 0 && selectedDocs.length === documents.length
+  const someSelected = selectedDocs.length > 0 && !allSelected
+
+  const toggleRow = (docId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(docId)) next.delete(docId)
+      else next.add(docId)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(documents.map((doc) => String(doc.$id))))
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const handleBulkFixQr = async () => {
+    const controller = new AbortController()
+    bulkAbortRef.current = controller
+    setBulk({ kind: 'fix-qr', running: true, progress: null })
+    try {
+      const result = await bulkFixCertificateQrs(selectedDocs, admin.fixCertificateQr, {
+        signal: controller.signal,
+        onProgress: (progress) => setBulk((prev) => (prev ? { ...prev, progress } : prev)),
+      })
+      setBulk({ kind: 'fix-qr', running: false, progress: null, result })
+    } catch (err) {
+      setBulk(
+        err instanceof DOMException && err.name === 'AbortError'
+          ? null
+          : { kind: 'fix-qr', running: false, progress: null, error: err instanceof Error ? err.message : 'Bulk Fix QR failed' }
+      )
+    } finally {
+      bulkAbortRef.current = null
+      fetchData(page, search)
+    }
+  }
+
+  const handleBulkDownload = async () => {
+    const controller = new AbortController()
+    bulkAbortRef.current = controller
+    setBulk({ kind: 'download', running: true, progress: null })
+    try {
+      const result = await buildCertificateImagesZip(
+        selectedDocs,
+        (url, signal) => fetch(url, { credentials: 'include', signal }),
+        {
+          signal: controller.signal,
+          onProgress: (progress) => setBulk((prev) => (prev ? { ...prev, progress } : prev)),
+        }
+      )
+      const url = URL.createObjectURL(new Blob([result.zip as BlobPart], { type: 'application/zip' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = certificatesZipFileName()
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setBulk({ kind: 'download', running: false, progress: null, result })
+    } catch (err) {
+      setBulk(
+        err instanceof DOMException && err.name === 'AbortError'
+          ? null
+          : { kind: 'download', running: false, progress: null, error: err instanceof Error ? err.message : 'Download failed' }
+      )
+    } finally {
+      bulkAbortRef.current = null
+    }
+  }
+
+  const closeBulkModal = () => {
+    if (bulk?.running) {
+      bulkAbortRef.current?.abort()
+      return
+    }
+    setBulk(null)
+  }
+
   const getCsvMapping = () => {
     if (!csvData) return []
     const columnKeys = columns.map((c) => c.key)
@@ -458,6 +562,36 @@ function RowsTab() {
     <div className="flex h-full min-h-0 flex-col">
       {/* Toolbar */}
       <div className="mb-6 flex shrink-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {selectedDocs.length > 0 ? (
+        <div className="flex items-center gap-3" role="toolbar" aria-label="Bulk actions for selected rows">
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            aria-label="Clear selection"
+            title="Clear selection"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <span className="text-xs text-foreground">{selectedDocs.length} selected</span>
+          <button
+            type="button"
+            onClick={handleBulkFixQr}
+            disabled={bulk?.running}
+            className="flex items-center gap-2 rounded-md bg-gold px-4 py-2.5 text-xs font-medium text-gold-foreground transition-all hover:brightness-110 disabled:opacity-50"
+          >
+            <ScanLine className="h-4 w-4" /> Bulk Fix QR
+          </button>
+          <button
+            type="button"
+            onClick={handleBulkDownload}
+            disabled={bulk?.running}
+            className="flex items-center gap-2 rounded-md border border-border px-4 py-2.5 text-xs text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" /> Download Certificates (zip)
+          </button>
+        </div>
+        ) : (
         <div className="flex items-center gap-3">
           <button
             onClick={() => setFormMode('add')}
@@ -521,6 +655,7 @@ function RowsTab() {
             )}
           </span>
         </div>
+        )}
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -547,6 +682,17 @@ function RowsTab() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-secondary/50">
+              <th className="w-10 px-4 py-3 text-left">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = someSelected }}
+                  onChange={toggleAll}
+                  disabled={documents.length === 0}
+                  aria-label={allSelected ? 'Deselect all rows on this page' : 'Select all rows on this page'}
+                  className="h-4 w-4 cursor-pointer accent-[var(--gold)]"
+                />
+              </th>
               <th className="px-4 py-3 text-left text-[10px] uppercase tracking-widest text-muted-foreground">Actions</th>
               {showQrs && (
                 <th className="px-4 py-3 text-left text-[10px] uppercase tracking-widest text-muted-foreground">QR</th>
@@ -561,13 +707,26 @@ function RowsTab() {
           <tbody>
             {documents.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + (showQrs ? 2 : 1)} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                <td colSpan={columns.length + (showQrs ? 3 : 2)} className="px-4 py-12 text-center text-sm text-muted-foreground">
                   {search ? 'No matching rows found.' : 'No rows yet. Click "Add Row" to create one.'}
                 </td>
               </tr>
             ) : (
               documents.map((doc) => (
-                <tr key={doc.$id} className="border-b border-border/50 transition-colors hover:bg-secondary/30">
+                <tr
+                  key={doc.$id}
+                  aria-selected={selectedIds.has(String(doc.$id))}
+                  className={`border-b border-border/50 transition-colors ${selectedIds.has(String(doc.$id)) ? 'bg-gold/10' : 'hover:bg-secondary/30'}`}
+                >
+                  <td className="w-10 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(String(doc.$id))}
+                      onChange={() => toggleRow(String(doc.$id))}
+                      aria-label={`Select row ${doc.CERTIFICATE_NO || doc.$id}`}
+                      className="h-4 w-4 cursor-pointer accent-[var(--gold)]"
+                    />
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <div className="flex items-center gap-2">
                       <button
@@ -787,6 +946,107 @@ function RowsTab() {
                 className="w-full rounded-md border border-border px-4 py-3 text-xs font-medium text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground"
               >
                 {exporting ? 'Cancel' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Action Modal */}
+      {bulk && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={closeBulkModal} />
+          <div role="dialog" aria-modal="true" aria-labelledby="bulk-title" className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-border bg-card p-6 shadow-2xl">
+            <button onClick={closeBulkModal} aria-label="Close" className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+              <X className="h-5 w-5" />
+            </button>
+
+            <h3 id="bulk-title" className="font-heading text-lg font-semibold">
+              {bulk.kind === 'fix-qr' ? 'Bulk Fix QR' : 'Download Certificates'}
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {bulk.kind === 'fix-qr'
+                ? 'Fixes the QR on every selected certificate image that needs it. Rows already correct or without an image are ignored.'
+                : 'Original certificate images of the selected rows in a single zip. Rows without an image are ignored.'}
+            </p>
+
+            {bulk.running && (
+              <div className="mt-6">
+                <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  {bulk.progress
+                    ? `${bulk.kind === 'fix-qr' ? 'Fixing' : 'Downloading'} ${bulk.progress.done} / ${bulk.progress.total}`
+                    : 'Starting...'}
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full bg-gold transition-all duration-300"
+                    style={{ width: `${bulk.progress?.total ? (bulk.progress.done / bulk.progress.total) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {bulk.error && (
+              <div role="alert" className="mt-6 flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" /> {bulk.error}
+              </div>
+            )}
+
+            {bulk.kind === 'fix-qr' && bulk.result && (
+              <div className="mt-6 rounded-md border border-border bg-secondary/50 p-4 text-xs">
+                <p className="text-sm font-medium text-foreground">Bulk Fix QR Complete</p>
+                <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+                  <span className="text-green-500">✓ {bulk.result.fixed.length} fixed</span>
+                  <span className="text-muted-foreground">{bulk.result.alreadyCorrect.length} already correct</span>
+                  {bulk.result.skipped.length > 0 && (
+                    <span className="text-muted-foreground">{bulk.result.skipped.length} skipped (no image)</span>
+                  )}
+                  {bulk.result.failed.length > 0 && (
+                    <span className="text-destructive">✗ {bulk.result.failed.length} failed</span>
+                  )}
+                </div>
+                {bulk.result.failed.length > 0 && (
+                  <>
+                    <ul className="mt-3 max-h-28 space-y-1 overflow-y-auto text-destructive">
+                      {bulk.result.failed.map((f, i) => (
+                        <li key={`${f.certificateNo}-${i}`}>{f.certificateNo}: {f.message}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-muted-foreground">Use Fix QR on a failed row to select the QR region manually.</p>
+                  </>
+                )}
+              </div>
+            )}
+
+            {bulk.kind === 'download' && bulk.result && (
+              <div className="mt-6 rounded-md border border-border bg-secondary/50 p-4 text-xs">
+                <p className="text-sm font-medium text-foreground">Download Ready</p>
+                <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
+                  <span className="text-green-500">✓ {bulk.result.added} certificate(s) zipped</span>
+                  {bulk.result.skipped.length > 0 && (
+                    <span className="text-muted-foreground">{bulk.result.skipped.length} without image ignored</span>
+                  )}
+                  {bulk.result.failed.length > 0 && (
+                    <span className="text-destructive">✗ {bulk.result.failed.length} failed</span>
+                  )}
+                </div>
+                {bulk.result.failed.length > 0 && (
+                  <ul className="mt-3 max-h-28 space-y-1 overflow-y-auto text-destructive">
+                    {bulk.result.failed.map((f, i) => (
+                      <li key={`${f.certificateNo}-${i}`}>{f.certificateNo}: {f.message}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <div className="mt-6">
+              <button
+                onClick={closeBulkModal}
+                className="w-full rounded-md border border-border px-4 py-3 text-xs font-medium text-muted-foreground transition-all hover:border-gold/50 hover:text-foreground"
+              >
+                {bulk.running ? 'Stop' : 'Close'}
               </button>
             </div>
           </div>

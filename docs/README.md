@@ -15,6 +15,9 @@ Current live docs:
 - Certificate OCR auto-fill (admin Add/Edit row): rules in `Architecture.md`
   invariant 13; deployment notes, measured accuracy and the schema-drift
   follow-up in [`operational-handover.md`](operational-handover.md).
+- Admin row selection and bulk actions (**Bulk Fix QR**, **Download
+  Certificates** zip): rules in `Architecture.md` invariant 17; deployment notes
+  and smoke checks in [`operational-handover.md`](operational-handover.md).
 
 Historical audit and migration planning files were removed after the migration
 and architecture-audit work completed. Ignored local backups remain outside Git.

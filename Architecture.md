@@ -1,6 +1,6 @@
 # Global Lab Architecture Guide
 
-Last reviewed: **2026-11-19**
+Last reviewed: **2026-11-20**
 
 This is the durable engineering contract for Global Lab. Keep it short and
 current. Operational deployment evidence lives in
@@ -69,6 +69,15 @@ Every change must preserve or move the code toward these rules:
     Asia/Kolkata date on the server, in the separator/order style most common
     among the latest 50 stored dates (`lib/certificate-date.ts`). A supplied
     date is kept as given. Updates and existing rows are never back-filled.
+17. Admin bulk actions act only on rows the admin selected on the current page
+    and run in the browser through existing protected routes, one row at a
+    time (`lib/admin-bulk.ts`). Bulk Fix QR calls the per-row Fix QR route in
+    apply mode with each row's revision, so invariant 15 and revision checks
+    still hold per row; rows without a number or image are skipped, rows
+    already correct are left unchanged, and a row needing a manual region is
+    reported as failed rather than guessed. Download Certificates zips the
+    original images of selected rows, ignores rows without an image, and shows
+    an explicit "No photo selected" error instead of an empty zip.
 
 ## Boundary Rules
 
@@ -78,6 +87,7 @@ Every change must preserve or move the code toward these rules:
 | UI components | Presentation, form state, loading/error states | SQL, secrets, provider signing or trusted validation |
 | OCR modules | Browser-local text recognition and pure field extraction | Network writes, SQL or form state |
 | CSV modules | Pure parsing, header mapping and preflight validation | React state or network writes |
+| Bulk action module (`lib/admin-bulk.ts`) | Sequential per-row orchestration over injected request/fetch functions, result classification, zip assembly | React state, direct SQL/R2 access, new server routes |
 | Certificate server module | Invariants, revision checks and transaction ownership | Browser assumptions |
 | Storage/image modules | R2 protocol, file validation and bounded processing | Certificate form state |
 | Certificate QR repair (`lib/qr-locate.ts`, `lib/certificate-qr-fix.ts`, `lib/admin-certificate-qr-fix.ts`) | Deterministic QR location, pixel-exact repaint, decode verification, and the server use-case that stores the result as a new image | React state, SQL outside `updateAdminCertificate`, any ML/OCR/heuristic-with-randomness step |
